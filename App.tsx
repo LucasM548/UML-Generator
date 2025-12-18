@@ -676,8 +676,8 @@ export default function App() {
         onDeleteAssociation={handleDeleteAssociation}
         selectedId={selectedId}
         selectedType={selectedType}
-        onExport={handleExport}
         onExportPng={handleExportPng}
+        onExport={handleExport}
         onImport={handleImport}
         onClear={handleClear}
         focusField={focusField}

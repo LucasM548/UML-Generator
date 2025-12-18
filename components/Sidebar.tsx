@@ -166,18 +166,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
             {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
           </button>
           <button
-            onClick={onExport}
-            className={`p-1.5 rounded transition-colors ${theme === 'dark' ? 'text-slate-400 hover:text-blue-400 hover:bg-slate-700' : 'text-slate-600 hover:text-blue-600 hover:bg-blue-50'}`}
-            title="Sauvegarder (Export JSON)"
-          >
-            <Download size={18} />
-          </button>
-          <button
             onClick={onExportPng}
             className={`p-1.5 rounded transition-colors ${theme === 'dark' ? 'text-slate-400 hover:text-green-400 hover:bg-slate-700' : 'text-slate-600 hover:text-green-600 hover:bg-green-50'}`}
             title="Exporter en PNG (fond transparent)"
           >
             <Image size={18} />
+          </button>
+          <button
+            onClick={onExport}
+            className={`p-1.5 rounded transition-colors ${theme === 'dark' ? 'text-slate-400 hover:text-blue-400 hover:bg-slate-700' : 'text-slate-600 hover:text-blue-600 hover:bg-blue-50'}`}
+            title="Sauvegarder (Export JSON)"
+          >
+            <Download size={18} />
           </button>
           <label
             className={`p-1.5 rounded transition-colors cursor-pointer ${theme === 'dark' ? 'text-slate-400 hover:text-blue-400 hover:bg-slate-700' : 'text-slate-600 hover:text-blue-600 hover:bg-blue-50'}`}
