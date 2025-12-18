@@ -485,21 +485,24 @@ export default function App() {
       const style = element.getAttribute('style');
       if (style) {
         let newStyle = style;
-        // First, specifically handle text stroke (paint-order stroke) - convert dark to white
+
+        // Handle text with paint-order (stroke outline effect)
         if (style.includes('paint-order')) {
-          // This is text with stroke outline - convert dark stroke to white
-          newStyle = newStyle.replace(/stroke:\s*#1e293b/g, 'stroke: white');
+          // Convert dark stroke to white for text outlines
+          newStyle = newStyle.replace(/stroke:\s*#1e293b/gi, 'stroke: white');
+          newStyle = newStyle.replace(/stroke:\s*rgb\(30,\s*41,\s*59\)/gi, 'stroke: white');
+          // Convert light text fill to dark
+          newStyle = newStyle.replace(/fill:\s*#f1f5f9/gi, 'fill: black');
+          newStyle = newStyle.replace(/fill:\s*rgb\(241,\s*245,\s*249\)/gi, 'fill: black');
+          // Convert light purple to standard purple
+          newStyle = newStyle.replace(/fill:\s*#a78bfa/gi, 'fill: #7c3aed');
+          newStyle = newStyle.replace(/fill:\s*rgb\(167,\s*139,\s*250\)/gi, 'fill: #7c3aed');
+        } else {
+          // For non-text elements, apply standard color replacements
+          Object.entries(colorReplacements).forEach(([dark, light]) => {
+            newStyle = newStyle.replace(new RegExp(dark, 'gi'), light);
+          });
         }
-        // Then apply other color replacements
-        Object.entries(colorReplacements).forEach(([dark, light]) => {
-          // Don't replace #1e293b in style if it's already been handled as stroke
-          if (dark === '#1e293b' && newStyle.includes('paint-order')) {
-            // Only replace fill, not stroke
-            newStyle = newStyle.replace(new RegExp(`fill:\\s*${dark}`, 'g'), `fill: ${light}`);
-          } else {
-            newStyle = newStyle.replace(new RegExp(dark, 'g'), light);
-          }
-        });
         element.setAttribute('style', newStyle);
       }
       // Recurse to children
