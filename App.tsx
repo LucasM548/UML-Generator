@@ -81,6 +81,67 @@ export default function App() {
   // Toast notification state
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
+  // Focus field state for auto-focus in Sidebar
+  const [focusField, setFocusField] = useState<{ type: 'entity-name' | 'association-label'; id: string } | null>(null);
+
+  // History for undo functionality
+  const [history, setHistory] = useState<Array<{ entities: Entity[]; associations: Association[] }>>([]);
+  const maxHistorySize = 50;
+
+  // Save current state to history
+  const saveToHistory = () => {
+    setHistory(prev => {
+      const newHistory = [...prev, { entities, associations }];
+      if (newHistory.length > maxHistorySize) {
+        return newHistory.slice(-maxHistorySize);
+      }
+      return newHistory;
+    });
+  };
+
+  // Undo function
+  const handleUndo = () => {
+    if (history.length === 0) return;
+
+    const previousState = history[history.length - 1];
+    setEntities(previousState.entities);
+    setAssociations(previousState.associations);
+    setHistory(prev => prev.slice(0, -1));
+    setSelectedId(null);
+    setSelectedType(null);
+    setToast({ message: "Annulé", type: 'success' });
+  };
+
+  // Keyboard shortcuts: Delete and Ctrl+Z
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't trigger if user is typing in an input
+      const target = e.target as HTMLElement;
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return;
+
+      // Delete key - delete selected item
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        if (selectedId && selectedType) {
+          e.preventDefault();
+          if (selectedType === 'entity') {
+            handleDeleteEntityDirect(selectedId);
+          } else {
+            handleDeleteAssociationDirect(selectedId);
+          }
+        }
+      }
+
+      // Ctrl+Z - Undo
+      if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
+        e.preventDefault();
+        handleUndo();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedId, selectedType, entities, associations, history]);
+
   // Auto-hide toast after 3 seconds
   useEffect(() => {
     if (toast) {
@@ -104,45 +165,117 @@ export default function App() {
     setSelectedType('entity');
   };
 
-  const handleUpdateEntity = (updated: Entity) => {
-    setEntities(prev => prev.map(e => e.id === updated.id ? updated : e));
+  // Create entity at specific position (for double-click)
+  const handleCreateEntityAtPosition = (x: number, y: number) => {
+    const newEntity: Entity = {
+      id: crypto.randomUUID(),
+      name: 'Nouvelle entité',
+      x,
+      y,
+      width: 160,
+      height: 80,
+      attributes: []
+    };
+    setEntities(prev => [...prev, newEntity]);
+    setSelectedId(newEntity.id);
+    setSelectedType('entity');
+    setFocusField({ type: 'entity-name', id: newEntity.id });
   };
 
-  const handleDeleteEntity = (id: string) => {
-    if (window.confirm("Supprimer cette entité ?")) {
-      // 1. Remove entity
-      setEntities(prev => prev.filter(e => e.id !== id));
+  // Quick connect entities (for Ctrl+click)
+  const handleQuickConnect = (sourceId: string, sourceType: 'entity' | 'association', targetEntityId: string) => {
+    if (sourceType === 'entity') {
+      // Create a new association between two entities
+      const sourceEntity = entities.find(e => e.id === sourceId);
+      const targetEntity = entities.find(e => e.id === targetEntityId);
+      if (!sourceEntity || !targetEntity) return;
 
-      // 2. Update associations based on rules
-      setAssociations(prevAssocs => {
-        return prevAssocs.reduce((acc, assoc) => {
-          const isConnected = assoc.connections.some(c => c.entityId === id);
+      // Calculate position at midpoint between entities
+      const midX = (sourceEntity.x + sourceEntity.width / 2 + targetEntity.x + targetEntity.width / 2) / 2;
+      const midY = (sourceEntity.y + sourceEntity.height / 2 + targetEntity.y + targetEntity.height / 2) / 2;
 
-          if (!isConnected) {
-            // Not connected to deleted entity: Keep as is
-            acc.push(assoc);
-          } else {
-            // Connected. Check arity (number of connections)
-            // If it was a Ternary or more (>2), we keep it but remove the leg.
-            // If it was Binary or Unary (<=2), we delete it entirely.
-            if (assoc.connections.length > 2) {
-              acc.push({
-                ...assoc,
-                connections: assoc.connections.filter(c => c.entityId !== id)
-              });
-            }
-            // Else: drop association (it becomes invalid/too simple)
-          }
-          return acc;
-        }, [] as Association[]);
-      });
+      const newAssoc: Association = {
+        id: crypto.randomUUID(),
+        label: '',
+        x: midX,
+        y: midY,
+        attributes: [],
+        connections: [
+          { id: crypto.randomUUID(), entityId: sourceId, cardinality: '0..*' },
+          { id: crypto.randomUUID(), entityId: targetEntityId, cardinality: '0..*' }
+        ]
+      };
+      setAssociations(prev => [...prev, newAssoc]);
+      setSelectedId(newAssoc.id);
+      setSelectedType('association');
+      setFocusField({ type: 'association-label', id: newAssoc.id });
+    } else {
+      // Add a connection to an existing association
+      const assoc = associations.find(a => a.id === sourceId);
+      if (!assoc) return;
 
-      setSelectedId(null);
-      setSelectedType(null);
+      // Check if the entity is already connected
+      if (assoc.connections.some(c => c.entityId === targetEntityId)) return;
+
+      const updatedAssoc: Association = {
+        ...assoc,
+        connections: [
+          ...assoc.connections,
+          { id: crypto.randomUUID(), entityId: targetEntityId, cardinality: '0..*' }
+        ]
+      };
+      setAssociations(prev => prev.map(a => a.id === sourceId ? updatedAssoc : a));
+      setSelectedId(sourceId);
+      setSelectedType('association');
+      setFocusField({ type: 'association-label', id: sourceId });
     }
   };
 
+  const handleFocusHandled = () => {
+    setFocusField(null);
+  };
+
+  const handleUpdateEntity = (updated: Entity) => {
+    saveToHistory();
+    setEntities(prev => prev.map(e => e.id === updated.id ? updated : e));
+  };
+
+  // Direct delete without confirmation (called from keyboard shortcut)
+  const handleDeleteEntityDirect = (id: string) => {
+    saveToHistory();
+    // 1. Remove entity
+    setEntities(prev => prev.filter(e => e.id !== id));
+
+    // 2. Update associations based on rules
+    setAssociations(prevAssocs => {
+      return prevAssocs.reduce((acc, assoc) => {
+        const isConnected = assoc.connections.some(c => c.entityId === id);
+
+        if (!isConnected) {
+          acc.push(assoc);
+        } else {
+          if (assoc.connections.length > 2) {
+            acc.push({
+              ...assoc,
+              connections: assoc.connections.filter(c => c.entityId !== id)
+            });
+          }
+        }
+        return acc;
+      }, [] as Association[]);
+    });
+
+    setSelectedId(null);
+    setSelectedType(null);
+  };
+
+  // Delete from sidebar button (no confirmation now)
+  const handleDeleteEntity = (id: string) => {
+    handleDeleteEntityDirect(id);
+  };
+
   const handleAddAssociation = (assoc: Omit<Association, 'id'>) => {
+    saveToHistory();
     const newAssoc = { ...assoc, id: crypto.randomUUID() };
     setAssociations(prev => [...prev, newAssoc]);
     setSelectedId(newAssoc.id);
@@ -150,13 +283,20 @@ export default function App() {
   };
 
   const handleUpdateAssociation = (updated: Association) => {
+    saveToHistory();
     setAssociations(prev => prev.map(a => a.id === updated.id ? updated : a));
   };
 
-  const handleDeleteAssociation = (id: string) => {
+  // Direct delete without confirmation (called from keyboard shortcut)
+  const handleDeleteAssociationDirect = (id: string) => {
+    saveToHistory();
     setAssociations(prev => prev.filter(a => a.id !== id));
     setSelectedId(null);
     setSelectedType(null);
+  };
+
+  const handleDeleteAssociation = (id: string) => {
+    handleDeleteAssociationDirect(id);
   };
 
   const handleMove = (id: string, x: number, y: number, type: 'entity' | 'association') => {
@@ -176,7 +316,12 @@ export default function App() {
   const handleSelect = (id: string | null, type: 'entity' | 'association' | null) => {
     setSelectedId(id);
     setSelectedType(type);
+    // Auto-focus on association label when selected
+    if (type === 'association' && id) {
+      setFocusField({ type: 'association-label', id });
+    }
   };
+
 
   // Export Logic
   const handleExport = () => {
@@ -405,15 +550,17 @@ export default function App() {
           onMoveEntityBox={handleMoveEntityBox}
           selectedId={selectedId}
           onSelect={handleSelect}
+          onCreateEntityAtPosition={handleCreateEntityAtPosition}
+          onQuickConnect={handleQuickConnect}
         />
 
         <div className="absolute bottom-4 left-4 bg-white/90 p-3 rounded-lg shadow-md border border-slate-200 pointer-events-none">
           <h4 className="font-bold text-sm text-slate-700 mb-1">Guide V2 (MCD)</h4>
           <ul className="text-xs text-slate-600 space-y-1">
-            <li>• Entités = rectangles.</li>
-            <li>• Relations = Libellé (2), Triangle (3), Carré (4+).</li>
-            <li>• Glissez le libellé pour courber la ligne.</li>
-            <li>• Ajoutez des propriétés à une relation pour faire une Entité-Association.</li>
+            <li>• Double-clic = créer entité.</li>
+            <li>• Ctrl+Clic = relier entités.</li>
+            <li>• Glissez le libellé pour courber.</li>
+            <li>• + Propriétés = Entité-Association.</li>
           </ul>
         </div>
       </main>
@@ -433,6 +580,8 @@ export default function App() {
         onExportPng={handleExportPng}
         onImport={handleImport}
         onClear={handleClear}
+        focusField={focusField}
+        onFocusHandled={handleFocusHandled}
       />
     </div>
   );

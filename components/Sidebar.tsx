@@ -17,6 +17,8 @@ interface SidebarProps {
   onExportPng: () => void;
   onImport: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onClear: () => void;
+  focusField?: { type: 'entity-name' | 'association-label'; id: string } | null;
+  onFocusHandled?: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -33,10 +35,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onExport,
   onExportPng,
   onImport,
-  onClear
+  onClear,
+  focusField,
+  onFocusHandled
 }) => {
   const [newEntityName, setNewEntityName] = useState('');
   const [activeTab, setActiveTab] = useState<'entities' | 'associations'>('entities');
+
+  // Refs for auto-focus on entity name and association label
+  const entityNameRef = useRef<HTMLInputElement>(null);
+  const assocLabelRef = useRef<HTMLInputElement>(null);
 
   // Auto-switch tab when selecting an item on the canvas
   useEffect(() => {
@@ -46,6 +54,24 @@ export const Sidebar: React.FC<SidebarProps> = ({
       setActiveTab('associations');
     }
   }, [selectedId, selectedType]);
+
+  // Handle focusField prop for auto-focus
+  useEffect(() => {
+    if (!focusField) return;
+
+    const timer = setTimeout(() => {
+      if (focusField.type === 'entity-name' && entityNameRef.current) {
+        entityNameRef.current.focus();
+        entityNameRef.current.select();
+      } else if (focusField.type === 'association-label' && assocLabelRef.current) {
+        assocLabelRef.current.focus();
+        assocLabelRef.current.select();
+      }
+      onFocusHandled?.();
+    }, 50);
+
+    return () => clearTimeout(timer);
+  }, [focusField, onFocusHandled]);
 
   // New Association State
   const [newAssocLabel, setNewAssocLabel] = useState('');
@@ -215,7 +241,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 </div>
                 <div>
                   <label className="text-xs text-gray-500">Nom</label>
-                  <input type="text" value={selectedEntity.name} onChange={(e) => onUpdateEntity({ ...selectedEntity, name: e.target.value })} className="w-full border rounded px-2 py-1 text-sm font-bold" />
+                  <input
+                    ref={entityNameRef}
+                    type="text"
+                    value={selectedEntity.name}
+                    onChange={(e) => onUpdateEntity({ ...selectedEntity, name: e.target.value })}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        // Create a new attribute and focus on it
+                        handleAddAttribute(false, selectedEntity);
+                      }
+                    }}
+                    className="w-full border rounded px-2 py-1 text-sm font-bold"
+                  />
                 </div>
 
                 <div className="space-y-2">
@@ -281,7 +320,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <div className="grid gap-2">
                   <div>
                     <label className="text-xs text-gray-500">Libellé</label>
-                    <input type="text" value={selectedAssoc.label} onChange={(e) => onUpdateAssociation({ ...selectedAssoc, label: e.target.value })} className="w-full border rounded px-2 py-1 text-sm font-bold" />
+                    <input ref={assocLabelRef} type="text" value={selectedAssoc.label} onChange={(e) => onUpdateAssociation({ ...selectedAssoc, label: e.target.value })} className="w-full border rounded px-2 py-1 text-sm font-bold" />
                   </div>
                   {/* Entity Name Field */}
                   <div>

@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Entity, Association } from '../types';
 import { EntityBox } from './EntityBox';
 import { AssociationNode } from './AssociationNode';
@@ -11,6 +11,8 @@ interface DiagramCanvasProps {
   onMoveEntityBox: (id: string, x: number, y: number) => void;
   selectedId: string | null;
   onSelect: (id: string | null, type: 'entity' | 'association' | null) => void;
+  onCreateEntityAtPosition?: (x: number, y: number) => void;
+  onQuickConnect?: (sourceId: string, sourceType: 'entity' | 'association', targetEntityId: string) => void;
 }
 
 export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
@@ -20,13 +22,44 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
   onMoveEntityBox,
   selectedId,
   onSelect,
+  onCreateEntityAtPosition,
+  onQuickConnect,
 }) => {
   const [dragging, setDragging] = useState<{ id: string; type: 'entity' | 'association' | 'entityBox' } | null>(null);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
   const svgRef = useRef<SVGSVGElement>(null);
 
+  // Connection mode state for Ctrl+Drag linking
+  const [connectionMode, setConnectionMode] = useState<{
+    sourceId: string;
+    sourceType: 'entity' | 'association';
+  } | null>(null);
+  const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
+
+  // Cancel connection mode with Escape key or when Ctrl is released
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && connectionMode) {
+        setConnectionMode(null);
+      }
+    };
+    const handleKeyUp = (e: KeyboardEvent) => {
+      // Cancel connection mode if Ctrl is released
+      if ((e.key === 'Control' || e.key === 'Meta') && connectionMode) {
+        setConnectionMode(null);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+    };
+  }, [connectionMode]);
+
   const handleMouseDown = (e: React.MouseEvent, id: string, type: 'entity' | 'association') => {
     e.stopPropagation();
+    e.preventDefault(); // Prevent text selection
 
     // Find the object
     const obj = type === 'entity'
@@ -34,6 +67,24 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
       : associations.find(a => a.id === id);
 
     if (!obj || !svgRef.current) return;
+
+    // Handle Ctrl+Drag for connection mode - start dragging to connect
+    if (e.ctrlKey || e.metaKey) {
+      // Start connection mode from entity or association
+      if (type === 'entity') {
+        setConnectionMode({ sourceId: id, sourceType: 'entity' });
+        onSelect(id, type);
+        return;
+      } else if (type === 'association') {
+        const assoc = obj as import('../types').Association;
+        // Only allow adding connections to n-ary associations (not binary locked)
+        if (assoc.connections.length >= 2) {
+          setConnectionMode({ sourceId: id, sourceType: 'association' });
+          onSelect(id, type);
+          return;
+        }
+      }
+    }
 
     // Always select the item
     onSelect(id, type);
@@ -89,6 +140,15 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
   };
 
   const handleMouseMove = (e: React.MouseEvent) => {
+    // Always track mouse position for connection mode
+    if (svgRef.current) {
+      const rect = svgRef.current.getBoundingClientRect();
+      setMousePos({
+        x: e.clientX - rect.left,
+        y: e.clientY - rect.top,
+      });
+    }
+
     if (!dragging || !svgRef.current) return;
 
     const rect = svgRef.current.getBoundingClientRect();
@@ -106,12 +166,76 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
     }
   };
 
-  const handleMouseUp = () => {
+  const handleMouseUp = (e: React.MouseEvent) => {
+    // If in connection mode, check if we're over an entity to complete the connection
+    if (connectionMode && svgRef.current) {
+      const rect = svgRef.current.getBoundingClientRect();
+      const mouseX = e.clientX - rect.left;
+      const mouseY = e.clientY - rect.top;
+
+      // Find entity under mouse position
+      const targetEntity = entities.find(entity => {
+        // Calculate entity dimensions (same as EntityBox component)
+        const headerHeight = 30;
+        const rowHeight = 24;
+        const padding = 10;
+        const charWidth = 8;
+        const entityNameWidth = entity.name.length * charWidth + 20;
+        const maxAttrWidth = entity.attributes.reduce((max, attr) => {
+          const attrText = (attr.isPk ? 'PK ' : '') + attr.name;
+          return Math.max(max, attrText.length * charWidth + 20);
+        }, 0);
+        const width = Math.max(entity.width, entityNameWidth, maxAttrWidth, 120);
+        const height = Math.max(entity.height, headerHeight + (entity.attributes.length * rowHeight) + padding);
+
+        return mouseX >= entity.x && mouseX <= entity.x + width &&
+          mouseY >= entity.y && mouseY <= entity.y + height;
+      });
+
+      if (targetEntity && targetEntity.id !== connectionMode.sourceId) {
+        // Complete the connection
+        if (onQuickConnect) {
+          onQuickConnect(connectionMode.sourceId, connectionMode.sourceType, targetEntity.id);
+        }
+      }
+      setConnectionMode(null);
+    }
+
     setDragging(null);
   };
 
-  const handleCanvasClick = () => {
+  const handleCanvasClick = (e: React.MouseEvent) => {
     onSelect(null, null);
+  };
+
+  const handleCanvasDoubleClick = (e: React.MouseEvent) => {
+    if (!svgRef.current || !onCreateEntityAtPosition) return;
+
+    const rect = svgRef.current.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
+    // Snap to grid
+    const snap = 10;
+    const snappedX = Math.round(x / snap) * snap;
+    const snappedY = Math.round(y / snap) * snap;
+
+    onCreateEntityAtPosition(snappedX, snappedY);
+  };
+
+  // Get the center position of the source for connection line rendering
+  const getSourceCenter = () => {
+    if (!connectionMode) return null;
+
+    if (connectionMode.sourceType === 'entity') {
+      const entity = entities.find(e => e.id === connectionMode.sourceId);
+      if (!entity) return null;
+      return getCenter(entity);
+    } else {
+      const assoc = associations.find(a => a.id === connectionMode.sourceId);
+      if (!assoc) return null;
+      return { x: assoc.x, y: assoc.y };
+    }
   };
 
   // Render a connection between an Association (Source) and an Entity (Target)
@@ -189,6 +313,13 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
           key={`${assoc.id}-binary`}
           onMouseDown={(e) => {
             e.stopPropagation();
+            e.preventDefault();
+            // Handle Ctrl+Drag to add connection to this binary association
+            if (e.ctrlKey || e.metaKey) {
+              setConnectionMode({ sourceId: assoc.id, sourceType: 'association' });
+              onSelect(assoc.id, 'association');
+              return;
+            }
             onSelect(assoc.id, 'association');
           }}
           style={{ cursor: 'pointer' }}
@@ -413,13 +544,17 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
     );
   };
 
+  const sourceCenter = getSourceCenter();
+
   return (
     <svg
       ref={svgRef}
-      className="w-full h-full bg-slate-50 cursor-crosshair overflow-hidden"
+      className={`w-full h-full bg-slate-50 overflow-hidden select-none ${connectionMode ? 'cursor-crosshair' : 'cursor-default'}`}
+      style={{ userSelect: 'none', WebkitUserSelect: 'none' }}
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
       onMouseDown={handleCanvasClick}
+      onDoubleClick={handleCanvasDoubleClick}
     >
       <defs>
         <pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse">
@@ -427,6 +562,20 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
         </pattern>
       </defs>
       <rect width="100%" height="100%" fill="url(#grid)" />
+
+      {/* Render connection preview line when in connection mode */}
+      {connectionMode && sourceCenter && (
+        <line
+          x1={sourceCenter.x}
+          y1={sourceCenter.y}
+          x2={mousePos.x}
+          y2={mousePos.y}
+          stroke="#3b82f6"
+          strokeWidth="2"
+          strokeDasharray="8 4"
+          className="pointer-events-none"
+        />
+      )}
 
       {/* Render Connections (Lines) first */}
       {associations.map(assoc =>
