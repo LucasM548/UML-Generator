@@ -1,6 +1,7 @@
 import React from 'react';
 import { Association } from '../types';
 import { getAssociationShapePoints } from '../utils/geometry';
+import { useTheme } from './ThemeContext';
 
 interface AssociationNodeProps {
   association: Association;
@@ -15,6 +16,7 @@ export const AssociationNode: React.FC<AssociationNodeProps> = ({
   onEntityBoxMouseDown,
   isSelected
 }) => {
+  const { theme } = useTheme();
   const count = association.connections.length;
   const isBinary = count <= 2;
   const points = getAssociationShapePoints(association);
@@ -71,8 +73,8 @@ export const AssociationNode: React.FC<AssociationNodeProps> = ({
         {/* Main Shape */}
         <polygon
           points={pointsStr}
-          fill={isBinary ? "transparent" : "white"}
-          stroke={isBinary ? "none" : (isSelected ? "#3b82f6" : "#000")}
+          fill={isBinary ? "transparent" : (theme === 'dark' ? '#1e293b' : 'white')}
+          stroke={isBinary ? "none" : (isSelected ? "#3b82f6" : (theme === 'dark' ? '#475569' : '#000'))}
           strokeWidth={isSelected ? 3 : 1.5}
           className="transition-colors duration-200"
         />
@@ -83,7 +85,7 @@ export const AssociationNode: React.FC<AssociationNodeProps> = ({
             x={points[0].x} y={points[0].y}
             width={points[2].x - points[0].x}
             height={points[2].y - points[0].y}
-            fill="white"
+            fill={theme === 'dark' ? '#1e293b' : 'white'}
             fillOpacity="0.8"
             rx="4"
           />
@@ -94,7 +96,7 @@ export const AssociationNode: React.FC<AssociationNodeProps> = ({
           x={association.x}
           y={association.y + 4}
           textAnchor="middle"
-          className={`text-xs font-bold pointer-events-none ${isSelected && isBinary ? 'fill-blue-600' : 'fill-slate-900'}`}
+          className={`text-xs font-bold pointer-events-none ${isSelected && isBinary ? 'fill-blue-600' : (theme === 'dark' ? 'fill-slate-100' : 'fill-slate-900')}`}
         >
           {association.label}
         </text>
@@ -116,8 +118,8 @@ export const AssociationNode: React.FC<AssociationNodeProps> = ({
           <rect
             width={boxWidth}
             height={boxHeight}
-            fill="white"
-            stroke={isSelected ? "#3b82f6" : "#000"}
+            fill={theme === 'dark' ? '#1e293b' : 'white'}
+            stroke={isSelected ? "#3b82f6" : (theme === 'dark' ? '#475569' : '#000')}
             strokeWidth={1.5}
             rx={4}
           />
@@ -125,8 +127,8 @@ export const AssociationNode: React.FC<AssociationNodeProps> = ({
           <rect
             width={boxWidth}
             height={headerHeight}
-            fill="#f3f4f6"
-            stroke="#000"
+            fill={theme === 'dark' ? '#334155' : '#f3f4f6'}
+            stroke={theme === 'dark' ? '#475569' : '#000'}
             strokeWidth={1}
             rx={4}
           />
@@ -135,11 +137,11 @@ export const AssociationNode: React.FC<AssociationNodeProps> = ({
             y={headerHeight - 5}
             width={boxWidth}
             height={5}
-            fill="#f3f4f6"
+            fill={theme === 'dark' ? '#334155' : '#f3f4f6'}
           />
-          <line x1={0} y1={headerHeight} x2={boxWidth} y2={headerHeight} stroke="black" strokeWidth={1} />
+          <line x1={0} y1={headerHeight} x2={boxWidth} y2={headerHeight} stroke={theme === 'dark' ? '#475569' : 'black'} strokeWidth={1} />
 
-          <text x={boxWidth / 2} y={20} textAnchor="middle" className="font-bold text-sm fill-slate-900 pointer-events-none">{displayName}</text>
+          <text x={boxWidth / 2} y={20} textAnchor="middle" className={`font-bold text-sm pointer-events-none ${theme === 'dark' ? 'fill-slate-100' : 'fill-slate-900'}`}>{displayName}</text>
 
           {/* Attributes */}
           {association.attributes.map((attr, index) => (
@@ -147,10 +149,10 @@ export const AssociationNode: React.FC<AssociationNodeProps> = ({
               key={attr.id}
               x={10}
               y={headerHeight + 20 + index * rowHeight}
-              className={`text-xs pointer-events-none fill-slate-800 ${attr.isPk ? 'font-bold underline' : ''}`}
+              className={`text-xs pointer-events-none ${attr.isPk ? 'font-bold underline' : ''} ${theme === 'dark' ? 'fill-slate-200' : 'fill-slate-800'}`}
             >
               {attr.name}
-              {attr.isPk && <tspan className="fill-red-600"> PK</tspan>}
+              {attr.isPk && <tspan className="fill-red-500"> PK</tspan>}
             </text>
           ))}
         </g>

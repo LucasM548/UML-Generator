@@ -1,5 +1,6 @@
 import React from 'react';
 import { Entity } from '../types';
+import { useTheme } from './ThemeContext';
 
 interface EntityBoxProps {
   entity: Entity;
@@ -8,6 +9,7 @@ interface EntityBoxProps {
 }
 
 export const EntityBox: React.FC<EntityBoxProps> = ({ entity, onMouseDown, isSelected }) => {
+  const { theme } = useTheme();
   // Constants for styling
   const headerHeight = 30;
   const rowHeight = 24;
@@ -57,8 +59,8 @@ export const EntityBox: React.FC<EntityBoxProps> = ({ entity, onMouseDown, isSel
       <rect
         width={calculatedWidth}
         height={calculatedHeight}
-        fill="white"
-        stroke={isSelected ? "#3b82f6" : "#000"}
+        fill={theme === 'dark' ? '#1e293b' : 'white'}
+        stroke={isSelected ? "#3b82f6" : (theme === 'dark' ? '#475569' : '#000')}
         strokeWidth={isSelected ? 3 : 1.5}
         className="transition-colors duration-200"
         rx={4}
@@ -68,8 +70,8 @@ export const EntityBox: React.FC<EntityBoxProps> = ({ entity, onMouseDown, isSel
       <rect
         width={calculatedWidth}
         height={headerHeight}
-        fill="#f3f4f6"
-        stroke="#000"
+        fill={theme === 'dark' ? '#334155' : '#f3f4f6'}
+        stroke={theme === 'dark' ? '#475569' : '#000'}
         strokeWidth={1}
         rx={4}
       />
@@ -78,31 +80,30 @@ export const EntityBox: React.FC<EntityBoxProps> = ({ entity, onMouseDown, isSel
         y={headerHeight - 5}
         width={calculatedWidth}
         height={5}
-        fill="#f3f4f6"
+        fill={theme === 'dark' ? '#334155' : '#f3f4f6'}
       />
-      <line x1={0} y1={headerHeight} x2={calculatedWidth} y2={headerHeight} stroke="black" strokeWidth={1} />
+      <line x1={0} y1={headerHeight} x2={calculatedWidth} y2={headerHeight} stroke={theme === 'dark' ? '#475569' : 'black'} strokeWidth={1} />
 
       <text
         x={calculatedWidth / 2}
         y={20}
         textAnchor="middle"
-        className="font-bold text-sm fill-slate-900 pointer-events-none"
+        className={`font-bold text-sm pointer-events-none ${theme === 'dark' ? 'fill-slate-100' : 'fill-slate-900'}`}
       >
         {truncateText(entity.name, maxChars)}
       </text>
 
-      {/* Attributes */}
       <g clipPath={`url(#clip-${entity.id})`}>
         {entity.attributes.map((attr, index) => (
           <text
             key={attr.id}
             x={10}
             y={headerHeight + 20 + (index * rowHeight)}
-            className={`text-sm pointer-events-none fill-slate-800 ${attr.isPk ? 'font-bold' : ''}`}
+            className={`text-sm pointer-events-none ${attr.isPk ? 'font-bold' : ''} ${theme === 'dark' ? 'fill-slate-200' : 'fill-slate-800'}`}
             style={{ textDecoration: attr.isPk ? 'underline' : 'none' }}
           >
             {truncateText(attr.name, maxChars - (attr.isPk ? 4 : 0))}
-            {attr.isPk && <tspan className="fill-red-600"> PK</tspan>}
+            {attr.isPk && <tspan className="fill-red-500"> PK</tspan>}
           </text>
         ))}
       </g>

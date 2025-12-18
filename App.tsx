@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { DiagramCanvas } from './components/DiagramCanvas';
 import { Entity, Association } from './types';
+import { useTheme } from './components/ThemeContext';
 
 // Initial data compatible with new N-ary structure
 const initialEntities: Entity[] = [
@@ -72,6 +73,7 @@ const initialAssociations: Association[] = [
 ];
 
 export default function App() {
+  const { theme } = useTheme();
   const [entities, setEntities] = useState<Entity[]>(initialEntities);
   const [associations, setAssociations] = useState<Association[]>(initialAssociations);
 
@@ -83,6 +85,9 @@ export default function App() {
 
   // Focus field state for auto-focus in Sidebar
   const [focusField, setFocusField] = useState<{ type: 'entity-name' | 'association-label'; id: string } | null>(null);
+
+  // Export modal state
+  const [exportModal, setExportModal] = useState<{ blob: Blob; url: string } | null>(null);
 
   // History for undo functionality
   const [history, setHistory] = useState<Array<{ entities: Entity[]; associations: Association[] }>>([]);
@@ -115,14 +120,26 @@ export default function App() {
   // Keyboard shortcuts: Delete and Ctrl+Z
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Don't trigger if user is typing in an input
       const target = e.target as HTMLElement;
-      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return;
 
-      // Delete key - delete selected item
+      // For Delete/Backspace, check if we should delete the entity/association
       if (e.key === 'Delete' || e.key === 'Backspace') {
+        // If in an input, only delete entity if ALL text is selected
+        if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') {
+          const input = target as HTMLInputElement;
+          const isAllSelected = input.selectionStart === 0 &&
+            input.selectionEnd === input.value.length &&
+            input.value.length > 0;
+          // If not all selected, let normal input behavior happen
+          if (!isAllSelected) return;
+        }
+
         if (selectedId && selectedType) {
           e.preventDefault();
+          // Blur any focused input before deleting
+          if (document.activeElement instanceof HTMLElement) {
+            document.activeElement.blur();
+          }
           if (selectedType === 'entity') {
             handleDeleteEntityDirect(selectedId);
           } else {
@@ -131,8 +148,9 @@ export default function App() {
         }
       }
 
-      // Ctrl+Z - Undo
+      // Ctrl+Z - Undo (only if not in input)
       if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
+        if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return;
         e.preventDefault();
         handleUndo();
       }
@@ -434,6 +452,80 @@ export default function App() {
       backgroundRect.setAttribute('fill', 'transparent');
     }
 
+    // Convert dark mode colors to light theme for export
+    // This ensures PNG export always uses light theme regardless of current theme
+    const colorReplacements: { [key: string]: string } = {
+      // Entity/box fills
+      '#1e293b': 'white',           // dark bg -> white
+      '#334155': '#f3f4f6',         // dark header -> light header
+      // Strokes
+      '#475569': '#000',            // dark border -> black
+      '#94a3b8': 'black',           // dark line -> black
+      // Text fills  
+      '#f1f5f9': 'black',           // light text -> black
+      '#a78bfa': '#7c3aed',         // light purple -> purple
+    };
+
+    // Replace colors in all elements
+    const replaceColors = (element: Element) => {
+      // Replace fill
+      const fill = element.getAttribute('fill');
+      if (fill && colorReplacements[fill]) {
+        element.setAttribute('fill', colorReplacements[fill]);
+      }
+      // Replace stroke
+      const stroke = element.getAttribute('stroke');
+      if (stroke && colorReplacements[stroke]) {
+        element.setAttribute('stroke', colorReplacements[stroke]);
+      }
+      // Replace style attribute colors
+      const style = element.getAttribute('style');
+      if (style) {
+        let newStyle = style;
+        Object.entries(colorReplacements).forEach(([dark, light]) => {
+          newStyle = newStyle.replace(new RegExp(dark, 'g'), light);
+        });
+        // Also ensure text strokes are white for light theme
+        newStyle = newStyle.replace(/stroke:\s*#1e293b/g, 'stroke: white');
+        element.setAttribute('style', newStyle);
+      }
+      // Recurse to children
+      Array.from(element.children).forEach(child => replaceColors(child));
+    };
+    replaceColors(svgClone);
+
+    // Remove selection highlights (blue strokes and selection boxes)
+    // Replace selection blue with normal black stroke
+    const removeSelection = (element: Element) => {
+      const stroke = element.getAttribute('stroke');
+      if (stroke === '#3b82f6') {
+        element.setAttribute('stroke', '#000');
+        // Reset stroke width if it was thickened for selection
+        const strokeWidth = element.getAttribute('stroke-width');
+        if (strokeWidth === '3' || strokeWidth === '2.5') {
+          element.setAttribute('stroke-width', '1.5');
+        }
+      }
+      // Remove selection highlight rectangles (dbeafe fill)
+      const fill = element.getAttribute('fill');
+      if (fill === '#dbeafe') {
+        element.remove();
+        return;
+      }
+      // Recurse to children
+      Array.from(element.children).forEach(child => removeSelection(child));
+    };
+    removeSelection(svgClone);
+
+    // Also fix class-based fills (Tailwind classes)
+    const textElements = svgClone.querySelectorAll('text, tspan');
+    textElements.forEach(el => {
+      const className = el.getAttribute('class') || '';
+      if (className.includes('fill-slate-100') || className.includes('fill-slate-200')) {
+        el.setAttribute('class', className.replace(/fill-slate-100|fill-slate-200/g, 'fill-slate-800'));
+      }
+    });
+
     // High resolution scale factor (3x for crisp export)
     const scale = 3;
 
@@ -472,13 +564,8 @@ export default function App() {
         canvas.toBlob((blob) => {
           if (blob) {
             const pngUrl = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = pngUrl;
-            a.download = `mcd_diagram_${new Date().toISOString().slice(0, 10)}.png`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(pngUrl);
+            // Show export modal with options
+            setExportModal({ blob, url: pngUrl });
           }
         }, 'image/png');
       }
@@ -533,7 +620,7 @@ export default function App() {
   };
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-slate-100 font-sans text-slate-900">
+    <div className={`flex h-screen w-screen overflow-hidden font-sans transition-colors duration-300 ${theme === 'dark' ? 'bg-slate-900 text-slate-100' : 'bg-slate-100 text-slate-900'}`}>
       {/* Toast notification */}
       {toast && (
         <div
@@ -556,9 +643,9 @@ export default function App() {
           onQuickConnect={handleQuickConnect}
         />
 
-        <div className="absolute bottom-4 left-4 bg-white/90 p-3 rounded-lg shadow-md border border-slate-200 pointer-events-none">
-          <h4 className="font-bold text-sm text-slate-700 mb-1">Guide (MCD)</h4>
-          <ul className="text-xs text-slate-600 space-y-1">
+        <div className={`absolute bottom-4 left-4 p-3 rounded-lg shadow-md border pointer-events-none transition-colors duration-300 ${theme === 'dark' ? 'bg-slate-800/90 border-slate-700' : 'bg-white/90 border-slate-200'}`}>
+          <h4 className={`font-bold text-sm mb-1 ${theme === 'dark' ? 'text-slate-200' : 'text-slate-700'}`}>Guide (MCD)</h4>
+          <ul className={`text-xs space-y-1 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
             <li>• Double-clic = créer entité.</li>
             <li>• Ctrl+Clic = relier entités.</li>
           </ul>
@@ -583,6 +670,85 @@ export default function App() {
         focusField={focusField}
         onFocusHandled={handleFocusHandled}
       />
+
+      {/* Export Modal */}
+      {exportModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => {
+          URL.revokeObjectURL(exportModal.url);
+          setExportModal(null);
+        }}>
+          <div
+            className={`p-6 rounded-xl shadow-2xl max-w-sm w-full mx-4 ${theme === 'dark' ? 'bg-slate-800' : 'bg-white'}`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className={`text-lg font-bold mb-4 ${theme === 'dark' ? 'text-slate-100' : 'text-slate-900'}`}>
+              Exporter l'image
+            </h3>
+
+            {/* Preview */}
+            <div className="mb-4 border rounded-lg overflow-hidden">
+              <img src={exportModal.url} alt="Aperçu du diagramme" className="w-full h-auto max-h-48 object-contain bg-gray-100" />
+            </div>
+
+            <div className="flex flex-col gap-3">
+              {/* Copy to Clipboard */}
+              <button
+                onClick={async () => {
+                  try {
+                    await navigator.clipboard.write([
+                      new ClipboardItem({ 'image/png': exportModal.blob })
+                    ]);
+                    setToast({ message: 'Image copiée dans le presse-papiers !', type: 'success' });
+                    URL.revokeObjectURL(exportModal.url);
+                    setExportModal(null);
+                  } catch (err) {
+                    console.error('Clipboard write failed:', err);
+                    setToast({ message: 'Erreur: impossible de copier', type: 'error' });
+                  }
+                }}
+                className="flex items-center justify-center gap-2 px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
+                </svg>
+                Copier dans le presse-papiers
+              </button>
+
+              {/* Save File */}
+              <button
+                onClick={() => {
+                  const a = document.createElement('a');
+                  a.href = exportModal.url;
+                  a.download = `mcd_diagram_${new Date().toISOString().slice(0, 10)}.png`;
+                  document.body.appendChild(a);
+                  a.click();
+                  document.body.removeChild(a);
+                  URL.revokeObjectURL(exportModal.url);
+                  setExportModal(null);
+                  setToast({ message: 'Image téléchargée !', type: 'success' });
+                }}
+                className={`flex items-center justify-center gap-2 px-4 py-3 rounded-lg transition-colors font-medium border ${theme === 'dark' ? 'border-slate-600 text-slate-200 hover:bg-slate-700' : 'border-gray-300 text-slate-700 hover:bg-gray-50'}`}
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                </svg>
+                Enregistrer l'image
+              </button>
+
+              {/* Cancel */}
+              <button
+                onClick={() => {
+                  URL.revokeObjectURL(exportModal.url);
+                  setExportModal(null);
+                }}
+                className={`px-4 py-2 text-sm ${theme === 'dark' ? 'text-slate-400 hover:text-slate-300' : 'text-gray-500 hover:text-gray-700'}`}
+              >
+                Annuler
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

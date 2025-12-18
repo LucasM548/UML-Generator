@@ -3,6 +3,7 @@ import { Entity, Association } from '../types';
 import { EntityBox } from './EntityBox';
 import { AssociationNode } from './AssociationNode';
 import { getCenter, getIntersection, getPolygonIntersection, getAssociationShapePoints, getLabelPosition } from '../utils/geometry';
+import { useTheme } from './ThemeContext';
 
 interface DiagramCanvasProps {
   entities: Entity[];
@@ -25,6 +26,7 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
   onCreateEntityAtPosition,
   onQuickConnect,
 }) => {
+  const { theme } = useTheme();
   const [dragging, setDragging] = useState<{ id: string; type: 'entity' | 'association' | 'entityBox' } | null>(null);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
   const svgRef = useRef<SVGSVGElement>(null);
@@ -339,7 +341,7 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
             y1={finalBorder1.y}
             x2={finalBorder2.x}
             y2={finalBorder2.y}
-            stroke={isSelected ? "#3b82f6" : "black"}
+            stroke={isSelected ? "#3b82f6" : (theme === 'dark' ? '#94a3b8' : 'black')}
             strokeWidth={isSelected ? 2.5 : 1.5}
           />
           {/* Selection highlight behind label */}
@@ -362,9 +364,9 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
             textAnchor="middle"
             style={{
               paintOrder: 'stroke',
-              stroke: 'white',
+              stroke: theme === 'dark' ? '#1e293b' : 'white',
               strokeWidth: '4px',
-              fill: isSelected ? '#1d4ed8' : 'black',
+              fill: isSelected ? '#3b82f6' : (theme === 'dark' ? '#f1f5f9' : 'black'),
               fontSize: '13px',
               fontWeight: 'bold',
             }}
@@ -378,13 +380,13 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
             textAnchor="middle"
             style={{
               paintOrder: 'stroke',
-              stroke: 'white',
+              stroke: theme === 'dark' ? '#1e293b' : 'white',
               strokeWidth: '5px',
-              fill: '#7c3aed',
+              fill: theme === 'dark' ? '#a78bfa' : '#7c3aed',
               fontSize: '13px',
               fontWeight: 'bold',
               pointerEvents: 'none',
-              filter: 'drop-shadow(0 0 1px rgba(124, 58, 237, 0.5))',
+              filter: theme === 'dark' ? 'none' : 'drop-shadow(0 0 1px rgba(124, 58, 237, 0.5))',
             }}
           >
             {assoc.connections[0].cardinality}
@@ -396,13 +398,13 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
             textAnchor="middle"
             style={{
               paintOrder: 'stroke',
-              stroke: 'white',
+              stroke: theme === 'dark' ? '#1e293b' : 'white',
               strokeWidth: '5px',
-              fill: '#7c3aed',
+              fill: theme === 'dark' ? '#a78bfa' : '#7c3aed',
               fontSize: '13px',
               fontWeight: 'bold',
               pointerEvents: 'none',
-              filter: 'drop-shadow(0 0 2px rgba(124, 58, 237, 0.5))',
+              filter: theme === 'dark' ? 'none' : 'drop-shadow(0 0 2px rgba(124, 58, 237, 0.5))',
             }}
           >
             {assoc.connections[1].cardinality}
@@ -438,10 +440,9 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
                 <line
                   x1={midX} y1={midY}
                   x2={boxCenterX} y2={boxCenterY}
-                  stroke="black" strokeDasharray="4" strokeWidth="1"
+                  stroke={theme === 'dark' ? '#94a3b8' : 'black'} strokeDasharray="4" strokeWidth="1"
                   className="pointer-events-none"
                 />
-                {/* Entity Box - draggable */}
                 <g
                   transform={`translate(${boxX}, ${boxY})`}
                   onMouseDown={(e) => {
@@ -453,16 +454,16 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
                   <rect
                     width={boxWidth}
                     height={boxHeight}
-                    fill="white"
-                    stroke={isSelected ? "#3b82f6" : "#000"}
+                    fill={theme === 'dark' ? '#1e293b' : 'white'}
+                    stroke={isSelected ? "#3b82f6" : (theme === 'dark' ? '#475569' : '#000')}
                     strokeWidth={1.5}
                     rx={4}
                   />
                   <rect
                     width={boxWidth}
                     height={headerHeight}
-                    fill="#f3f4f6"
-                    stroke="#000"
+                    fill={theme === 'dark' ? '#334155' : '#f3f4f6'}
+                    stroke={theme === 'dark' ? '#475569' : '#000'}
                     strokeWidth={1}
                     rx={4}
                   />
@@ -470,19 +471,19 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
                     y={headerHeight - 5}
                     width={boxWidth}
                     height={5}
-                    fill="#f3f4f6"
+                    fill={theme === 'dark' ? '#334155' : '#f3f4f6'}
                   />
-                  <line x1={0} y1={headerHeight} x2={boxWidth} y2={headerHeight} stroke="black" strokeWidth={1} />
-                  <text x={boxWidth / 2} y={20} textAnchor="middle" className="font-bold text-sm fill-slate-900 pointer-events-none">{displayName}</text>
+                  <line x1={0} y1={headerHeight} x2={boxWidth} y2={headerHeight} stroke={theme === 'dark' ? '#475569' : 'black'} strokeWidth={1} />
+                  <text x={boxWidth / 2} y={20} textAnchor="middle" className={`font-bold text-sm pointer-events-none ${theme === 'dark' ? 'fill-slate-100' : 'fill-slate-900'}`}>{displayName}</text>
                   {assoc.attributes.map((attr, index) => (
                     <text
                       key={attr.id}
                       x={10}
                       y={headerHeight + 20 + index * rowHeight}
-                      className={`text-xs pointer-events-none fill-slate-800 ${attr.isPk ? 'font-bold underline' : ''}`}
+                      className={`text-xs pointer-events-none ${attr.isPk ? 'font-bold underline' : ''} ${theme === 'dark' ? 'fill-slate-200' : 'fill-slate-800'}`}
                     >
                       {attr.name}
-                      {attr.isPk && <tspan className="fill-red-600"> PK</tspan>}
+                      {attr.isPk && <tspan className="fill-red-500"> PK</tspan>}
                     </text>
                   ))}
                 </g>
@@ -518,7 +519,7 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
           y1={borderA.y}
           x2={borderE.x}
           y2={borderE.y}
-          stroke="black"
+          stroke={theme === 'dark' ? '#94a3b8' : 'black'}
           strokeWidth="1.5"
         />
         <text
@@ -527,15 +528,15 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
           textAnchor="middle"
           style={{
             paintOrder: 'stroke',
-            stroke: 'white',
+            stroke: theme === 'dark' ? '#1e293b' : 'white',
             strokeWidth: '5px',
             strokeLinecap: 'butt',
             strokeLinejoin: 'round',
-            fill: '#7c3aed',
+            fill: theme === 'dark' ? '#a78bfa' : '#7c3aed',
             fontSize: '13px',
             fontWeight: 'bold',
             pointerEvents: 'none',
-            filter: 'drop-shadow(0 0 2px rgba(124, 58, 237, 0.5))',
+            filter: theme === 'dark' ? 'none' : 'drop-shadow(0 0 2px rgba(124, 58, 237, 0.5))',
           }}
         >
           {conn.cardinality}
@@ -549,7 +550,7 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
   return (
     <svg
       ref={svgRef}
-      className={`w-full h-full bg-slate-50 overflow-hidden select-none ${connectionMode ? 'cursor-crosshair' : 'cursor-default'}`}
+      className={`w-full h-full overflow-hidden select-none transition-colors duration-300 ${connectionMode ? 'cursor-crosshair' : 'cursor-default'} ${theme === 'dark' ? 'bg-slate-800' : 'bg-slate-50'}`}
       style={{ userSelect: 'none', WebkitUserSelect: 'none' }}
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
@@ -558,7 +559,7 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
     >
       <defs>
         <pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse">
-          <path d="M 20 0 L 0 0 0 20" fill="none" stroke="#e5e7eb" strokeWidth="1" />
+          <path d="M 20 0 L 0 0 0 20" fill="none" stroke={theme === 'dark' ? '#374151' : '#e5e7eb'} strokeWidth="1" />
         </pattern>
       </defs>
       <rect width="100%" height="100%" fill="url(#grid)" />

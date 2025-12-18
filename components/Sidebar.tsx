@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Entity, Attribute, Association, Connection } from '../types';
-import { Plus, Trash2, ArrowRightLeft, Database, Download, Upload, XCircle, Image } from 'lucide-react';
+import { Plus, Trash2, ArrowRightLeft, Database, Download, Upload, XCircle, Image, Sun, Moon } from 'lucide-react';
+import { useTheme } from './ThemeContext';
 
 interface SidebarProps {
   entities: Entity[];
@@ -39,6 +40,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   focusField,
   onFocusHandled
 }) => {
+  const { theme, toggleTheme } = useTheme();
   const [newEntityName, setNewEntityName] = useState('');
   const [activeTab, setActiveTab] = useState<'entities' | 'associations'>('entities');
 
@@ -151,27 +153,34 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const selectedAssoc = selectedType === 'association' ? associations.find(a => a.id === selectedId) : null;
 
   return (
-    <div className="w-80 h-full bg-white border-l border-gray-200 flex flex-col shadow-xl z-10">
+    <div className={`w-80 h-full border-l flex flex-col shadow-xl z-10 transition-colors duration-300 ${theme === 'dark' ? 'bg-slate-800 border-slate-700' : 'bg-white border-gray-200'}`}>
       {/* Header with Import/Export */}
-      <div className="p-4 border-b bg-slate-50 flex items-center justify-between">
-        <h2 className="font-bold text-slate-800">UML Builder</h2>
+      <div className={`p-4 border-b flex items-center justify-between transition-colors duration-300 ${theme === 'dark' ? 'bg-slate-900 border-slate-700' : 'bg-slate-50 border-gray-200'}`}>
+        <h2 className={`font-bold ${theme === 'dark' ? 'text-slate-100' : 'text-slate-800'}`}>UML Builder</h2>
         <div className="flex gap-2">
           <button
+            onClick={toggleTheme}
+            className={`p-1.5 rounded transition-colors ${theme === 'dark' ? 'text-yellow-400 hover:bg-slate-700' : 'text-slate-600 hover:text-amber-600 hover:bg-amber-50'}`}
+            title={theme === 'dark' ? 'Mode clair' : 'Mode sombre'}
+          >
+            {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+          </button>
+          <button
             onClick={onExport}
-            className="p-1.5 text-slate-600 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+            className={`p-1.5 rounded transition-colors ${theme === 'dark' ? 'text-slate-400 hover:text-blue-400 hover:bg-slate-700' : 'text-slate-600 hover:text-blue-600 hover:bg-blue-50'}`}
             title="Sauvegarder (Export JSON)"
           >
             <Download size={18} />
           </button>
           <button
             onClick={onExportPng}
-            className="p-1.5 text-slate-600 hover:text-green-600 hover:bg-green-50 rounded transition-colors"
+            className={`p-1.5 rounded transition-colors ${theme === 'dark' ? 'text-slate-400 hover:text-green-400 hover:bg-slate-700' : 'text-slate-600 hover:text-green-600 hover:bg-green-50'}`}
             title="Exporter en PNG (fond transparent)"
           >
             <Image size={18} />
           </button>
           <label
-            className="p-1.5 text-slate-600 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors cursor-pointer"
+            className={`p-1.5 rounded transition-colors cursor-pointer ${theme === 'dark' ? 'text-slate-400 hover:text-blue-400 hover:bg-slate-700' : 'text-slate-600 hover:text-blue-600 hover:bg-blue-50'}`}
             title="Ouvrir (Import JSON)"
           >
             <Upload size={18} />
@@ -185,7 +194,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </label>
           <button
             onClick={onClear}
-            className="p-1.5 text-slate-600 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+            className={`p-1.5 rounded transition-colors ${theme === 'dark' ? 'text-slate-400 hover:text-red-400 hover:bg-slate-700' : 'text-slate-600 hover:text-red-600 hover:bg-red-50'}`}
             title="Effacer tout le diagramme"
           >
             <XCircle size={18} />
@@ -193,15 +202,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
       </div>
 
-      <div className="flex border-b">
+      <div className={`flex border-b transition-colors duration-300 ${theme === 'dark' ? 'border-slate-700' : 'border-gray-200'}`}>
         <button
-          className={`flex-1 p-3 font-medium text-sm flex items-center justify-center gap-2 ${activeTab === 'entities' ? 'bg-blue-50 text-blue-600 border-b-2 border-blue-600' : 'text-gray-500 hover:bg-gray-50'}`}
+          className={`flex-1 p-3 font-medium text-sm flex items-center justify-center gap-2 transition-colors ${activeTab === 'entities'
+            ? (theme === 'dark' ? 'bg-blue-900/50 text-blue-400 border-b-2 border-blue-400' : 'bg-blue-50 text-blue-600 border-b-2 border-blue-600')
+            : (theme === 'dark' ? 'text-slate-400 hover:bg-slate-700' : 'text-gray-500 hover:bg-gray-50')}`}
           onClick={() => setActiveTab('entities')}
         >
           <Database size={16} /> Entités
         </button>
         <button
-          className={`flex-1 p-3 font-medium text-sm flex items-center justify-center gap-2 ${activeTab === 'associations' ? 'bg-blue-50 text-blue-600 border-b-2 border-blue-600' : 'text-gray-500 hover:bg-gray-50'}`}
+          className={`flex-1 p-3 font-medium text-sm flex items-center justify-center gap-2 transition-colors ${activeTab === 'associations'
+            ? (theme === 'dark' ? 'bg-blue-900/50 text-blue-400 border-b-2 border-blue-400' : 'bg-blue-50 text-blue-600 border-b-2 border-blue-600')
+            : (theme === 'dark' ? 'text-slate-400 hover:bg-slate-700' : 'text-gray-500 hover:bg-gray-50')}`}
           onClick={() => setActiveTab('associations')}
         >
           <ArrowRightLeft size={16} /> Relations
@@ -213,34 +226,34 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {activeTab === 'entities' && (
           <div className="space-y-6">
             <form onSubmit={(e) => { e.preventDefault(); if (newEntityName) { onAddEntity(newEntityName); setNewEntityName('') } }} className="space-y-2">
-              <label className="text-xs font-semibold text-gray-500 uppercase">Nouvelle Entité</label>
+              <label className={`text-xs font-semibold uppercase ${theme === 'dark' ? 'text-slate-400' : 'text-gray-500'}`}>Nouvelle Entité</label>
               <div className="flex gap-2">
                 <input
                   type="text"
                   value={newEntityName}
                   onChange={(e) => setNewEntityName(e.target.value)}
                   placeholder="Nom (ex: Client)"
-                  className="flex-1 border rounded px-2 py-1 text-sm"
+                  className={`flex-1 border rounded px-2 py-1 text-sm transition-colors ${theme === 'dark' ? 'bg-slate-700 border-slate-600 text-slate-100 placeholder-slate-400' : 'bg-white border-gray-300 text-slate-900'}`}
                 />
                 <button type="submit" className="bg-blue-600 text-white p-1 rounded hover:bg-blue-700"><Plus size={20} /></button>
               </div>
             </form>
 
-            <hr />
+            <hr className={theme === 'dark' ? 'border-slate-700' : 'border-gray-200'} />
 
             {selectedEntity ? (
               <div className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-200">
                 <div className="flex justify-between items-center">
-                  <h3 className="font-bold text-gray-800">Éditer: {selectedEntity.name}</h3>
+                  <h3 className={`font-bold ${theme === 'dark' ? 'text-slate-100' : 'text-gray-800'}`}>Éditer: {selectedEntity.name}</h3>
                   <button
                     onClick={(e) => { e.stopPropagation(); onDeleteEntity(selectedEntity.id); }}
-                    className="text-red-500 hover:bg-red-50 p-1 rounded transition-colors"
+                    className={`p-1 rounded transition-colors ${theme === 'dark' ? 'text-red-400 hover:bg-red-900/50' : 'text-red-500 hover:bg-red-50'}`}
                   >
                     <Trash2 size={16} />
                   </button>
                 </div>
                 <div>
-                  <label className="text-xs text-gray-500">Nom</label>
+                  <label className={`text-xs ${theme === 'dark' ? 'text-slate-400' : 'text-gray-500'}`}>Nom</label>
                   <input
                     ref={entityNameRef}
                     type="text"
@@ -249,21 +262,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') {
                         e.preventDefault();
-                        // Create a new attribute and focus on it
                         handleAddAttribute(false, selectedEntity);
                       }
                     }}
-                    className="w-full border rounded px-2 py-1 text-sm font-bold"
+                    className={`w-full border rounded px-2 py-1 text-sm font-bold transition-colors ${theme === 'dark' ? 'bg-slate-700 border-slate-600 text-slate-100' : 'bg-white border-gray-300 text-slate-900'}`}
                   />
                 </div>
 
                 <div className="space-y-2">
                   <div className="flex justify-between items-center">
-                    <label className="text-xs font-bold text-gray-500 uppercase">Attributs</label>
-                    <button onClick={() => handleAddAttribute(false, selectedEntity)} className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded">+ Ajouter</button>
+                    <label className={`text-xs font-bold uppercase ${theme === 'dark' ? 'text-slate-400' : 'text-gray-500'}`}>Attributs</label>
+                    <button onClick={() => handleAddAttribute(false, selectedEntity)} className={`text-xs px-2 py-0.5 rounded ${theme === 'dark' ? 'bg-green-900/50 text-green-400' : 'bg-green-100 text-green-700'}`}>+ Ajouter</button>
                   </div>
                   {selectedEntity.attributes.map((attr, index) => (
-                    <div key={attr.id} className="flex gap-1 items-center bg-gray-50 p-1 rounded border">
+                    <div key={attr.id} className={`flex gap-1 items-center p-1 rounded border transition-colors ${theme === 'dark' ? 'bg-slate-700 border-slate-600' : 'bg-gray-50 border-gray-200'}`}>
                       <input type="checkbox" checked={attr.isPk} onChange={(e) => updateAttribute(false, selectedEntity, attr.id, 'isPk', e.target.checked)} className="accent-red-500" title="Clé primaire" />
                       <input
                         type="text"
@@ -277,16 +289,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
                             handleAddAttribute(false, selectedEntity);
                           }
                         }}
-                        className={`flex-1 bg-transparent text-sm border-none p-0 ${attr.isPk ? 'font-bold' : ''}`}
+                        className={`flex-1 bg-transparent text-sm border-none p-0 ${attr.isPk ? 'font-bold' : ''} ${theme === 'dark' ? 'text-slate-100 placeholder-slate-500' : 'text-slate-800'}`}
                       />
                       {attr.isPk && <span className="text-xs bg-red-100 text-red-700 px-1 rounded font-bold">PK</span>}
-                      <button onClick={() => deleteAttribute(false, selectedEntity, attr.id)} className="text-gray-400 hover:text-red-500"><Trash2 size={14} /></button>
+                      <button onClick={() => deleteAttribute(false, selectedEntity, attr.id)} className={`${theme === 'dark' ? 'text-slate-500 hover:text-red-400' : 'text-gray-400 hover:text-red-500'}`}><Trash2 size={14} /></button>
                     </div>
                   ))}
                 </div>
               </div>
             ) : (
-              <p className="text-center text-gray-400 text-xs mt-10">Sélectionnez une entité pour éditer.</p>
+              <p className={`text-center text-xs mt-10 ${theme === 'dark' ? 'text-slate-500' : 'text-gray-400'}`}>Sélectionnez une entité pour éditer.</p>
             )}
           </div>
         )}
@@ -295,50 +307,50 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {activeTab === 'associations' && (
           <div className="space-y-6">
             <div className="space-y-2">
-              <label className="text-xs font-semibold text-gray-500 uppercase">Nouvelle Relation</label>
+              <label className={`text-xs font-semibold uppercase ${theme === 'dark' ? 'text-slate-400' : 'text-gray-500'}`}>Nouvelle Relation</label>
               <div className="flex gap-2">
                 <input
                   type="text"
                   value={newAssocLabel}
                   onChange={(e) => setNewAssocLabel(e.target.value)}
                   placeholder="Verbe (ex: achète)"
-                  className="flex-1 border rounded px-2 py-1 text-sm"
+                  className={`flex-1 border rounded px-2 py-1 text-sm transition-colors ${theme === 'dark' ? 'bg-slate-700 border-slate-600 text-slate-100 placeholder-slate-400' : 'bg-white border-gray-300 text-slate-900'}`}
                 />
                 <button onClick={handleCreateAssociation} className="bg-blue-600 text-white p-1 rounded hover:bg-blue-700"><Plus size={20} /></button>
               </div>
             </div>
 
-            <hr />
+            <hr className={theme === 'dark' ? 'border-slate-700' : 'border-gray-200'} />
 
             {selectedAssoc ? (
               <div className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-200">
                 <div className="flex justify-between items-center">
-                  <h3 className="font-bold text-gray-800">Relation: {selectedAssoc.label}</h3>
-                  <button onClick={() => onDeleteAssociation(selectedAssoc.id)} className="text-red-500 hover:bg-red-50 p-1 rounded"><Trash2 size={16} /></button>
+                  <h3 className={`font-bold ${theme === 'dark' ? 'text-slate-100' : 'text-gray-800'}`}>Relation: {selectedAssoc.label}</h3>
+                  <button onClick={() => onDeleteAssociation(selectedAssoc.id)} className={`p-1 rounded ${theme === 'dark' ? 'text-red-400 hover:bg-red-900/50' : 'text-red-500 hover:bg-red-50'}`}><Trash2 size={16} /></button>
                 </div>
 
                 <div className="grid gap-2">
                   <div>
-                    <label className="text-xs text-gray-500">Libellé</label>
-                    <input ref={assocLabelRef} type="text" value={selectedAssoc.label} onChange={(e) => onUpdateAssociation({ ...selectedAssoc, label: e.target.value })} className="w-full border rounded px-2 py-1 text-sm font-bold" />
+                    <label className={`text-xs ${theme === 'dark' ? 'text-slate-400' : 'text-gray-500'}`}>Libellé</label>
+                    <input ref={assocLabelRef} type="text" value={selectedAssoc.label} onChange={(e) => onUpdateAssociation({ ...selectedAssoc, label: e.target.value })} className={`w-full border rounded px-2 py-1 text-sm font-bold transition-colors ${theme === 'dark' ? 'bg-slate-700 border-slate-600 text-slate-100' : 'bg-white border-gray-300 text-slate-900'}`} />
                   </div>
                   {/* Entity Name Field */}
                   <div>
-                    <label className="text-xs text-gray-500 flex items-center gap-1">
+                    <label className={`text-xs flex items-center gap-1 ${theme === 'dark' ? 'text-slate-400' : 'text-gray-500'}`}>
                       Nom Entité Associative
-                      <span className="text-[10px] text-gray-400 font-normal">(optionnel)</span>
+                      <span className={`text-[10px] font-normal ${theme === 'dark' ? 'text-slate-500' : 'text-gray-400'}`}>(optionnel)</span>
                     </label>
                     <input
                       type="text"
                       value={selectedAssoc.entityName || ''}
                       onChange={(e) => onUpdateAssociation({ ...selectedAssoc, entityName: e.target.value })}
                       placeholder={selectedAssoc.label}
-                      className="w-full border rounded px-2 py-1 text-sm italic"
+                      className={`w-full border rounded px-2 py-1 text-sm italic transition-colors ${theme === 'dark' ? 'bg-slate-700 border-slate-600 text-slate-100 placeholder-slate-400' : 'bg-white border-gray-300 text-slate-900'}`}
                     />
                   </div>
                   {/* Label Movable checkbox - only for binary associations */}
                   {selectedAssoc.connections.length === 2 && (
-                    <div className="flex items-center gap-2 bg-amber-50 p-2 rounded border border-amber-200">
+                    <div className={`flex items-center gap-2 p-2 rounded border ${theme === 'dark' ? 'bg-amber-900/30 border-amber-700' : 'bg-amber-50 border-amber-200'}`}>
                       <input
                         type="checkbox"
                         id="isLabelMovable"
@@ -346,7 +358,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         onChange={(e) => onUpdateAssociation({ ...selectedAssoc, isLabelMovable: e.target.checked })}
                         className="accent-amber-500"
                       />
-                      <label htmlFor="isLabelMovable" className="text-xs text-amber-800 cursor-pointer">
+                      <label htmlFor="isLabelMovable" className={`text-xs cursor-pointer ${theme === 'dark' ? 'text-amber-400' : 'text-amber-800'}`}>
                         Libellé déplaçable
                       </label>
                     </div>
@@ -355,31 +367,31 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
                 <div className="space-y-2">
                   <div className="flex justify-between items-center">
-                    <label className="text-xs font-bold text-gray-500 uppercase">Liens ({selectedAssoc.connections.length})</label>
-                    <button onClick={() => addConnection(selectedAssoc)} className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded hover:bg-blue-200">+ Lier Entité</button>
+                    <label className={`text-xs font-bold uppercase ${theme === 'dark' ? 'text-slate-400' : 'text-gray-500'}`}>Liens ({selectedAssoc.connections.length})</label>
+                    <button onClick={() => addConnection(selectedAssoc)} className={`text-xs px-2 py-0.5 rounded ${theme === 'dark' ? 'bg-blue-900/50 text-blue-400 hover:bg-blue-900' : 'bg-blue-100 text-blue-700 hover:bg-blue-200'}`}>+ Lier Entité</button>
                   </div>
                   <div className="space-y-2">
                     {selectedAssoc.connections.map(conn => (
-                      <div key={conn.id} className="bg-gray-50 p-2 rounded border text-xs space-y-1">
+                      <div key={conn.id} className={`p-2 rounded border text-xs space-y-1 transition-colors ${theme === 'dark' ? 'bg-slate-700 border-slate-600' : 'bg-gray-50 border-gray-200'}`}>
                         <div className="flex justify-between">
-                          <span className="font-semibold text-gray-500">Vers:</span>
+                          <span className={`font-semibold ${theme === 'dark' ? 'text-slate-400' : 'text-gray-500'}`}>Vers:</span>
                           <button onClick={() => removeConnection(selectedAssoc, conn.id)} className="text-red-400 hover:text-red-600"><Trash2 size={12} /></button>
                         </div>
                         <select
                           value={conn.entityId}
                           onChange={(e) => updateConnection(selectedAssoc, conn.id, 'entityId', e.target.value)}
-                          className="w-full p-1 border rounded bg-white mb-1"
+                          className={`w-full p-1 border rounded mb-1 transition-colors ${theme === 'dark' ? 'bg-slate-600 border-slate-500 text-slate-100' : 'bg-white border-gray-300 text-slate-900'}`}
                         >
                           {entities.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
                         </select>
                         <div className="flex items-center gap-2">
-                          <span className="text-gray-500">Card:</span>
+                          <span className={theme === 'dark' ? 'text-slate-400' : 'text-gray-500'}>Card:</span>
                           <input
                             type="text"
                             list="card-options"
                             value={conn.cardinality}
                             onChange={(e) => updateConnection(selectedAssoc, conn.id, 'cardinality', e.target.value)}
-                            className="flex-1 p-1 border rounded"
+                            className={`flex-1 p-1 border rounded transition-colors ${theme === 'dark' ? 'bg-slate-600 border-slate-500 text-slate-100' : 'bg-white border-gray-300 text-slate-900'}`}
                           />
                         </div>
                       </div>
@@ -390,13 +402,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   </datalist>
                 </div>
 
-                <div className="space-y-2 pt-2 border-t">
+                <div className={`space-y-2 pt-2 border-t ${theme === 'dark' ? 'border-slate-700' : 'border-gray-200'}`}>
                   <div className="flex justify-between items-center">
-                    <label className="text-xs font-bold text-gray-500 uppercase">Propriétés</label>
-                    <button onClick={() => handleAddAttribute(true, selectedAssoc)} className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded">+ Ajouter</button>
+                    <label className={`text-xs font-bold uppercase ${theme === 'dark' ? 'text-slate-400' : 'text-gray-500'}`}>Propriétés</label>
+                    <button onClick={() => handleAddAttribute(true, selectedAssoc)} className={`text-xs px-2 py-0.5 rounded ${theme === 'dark' ? 'bg-green-900/50 text-green-400' : 'bg-green-100 text-green-700'}`}>+ Ajouter</button>
                   </div>
                   {selectedAssoc.attributes.map(attr => (
-                    <div key={attr.id} className="flex gap-1 items-center bg-gray-50 p-1 rounded border">
+                    <div key={attr.id} className={`flex gap-1 items-center p-1 rounded border transition-colors ${theme === 'dark' ? 'bg-slate-700 border-slate-600' : 'bg-gray-50 border-gray-200'}`}>
                       <input type="checkbox" checked={attr.isPk} onChange={(e) => updateAttribute(true, selectedAssoc, attr.id, 'isPk', e.target.checked)} className="accent-red-500" title="Clé primaire" />
                       <input
                         type="text"
@@ -410,24 +422,24 @@ export const Sidebar: React.FC<SidebarProps> = ({
                             handleAddAttribute(true, selectedAssoc);
                           }
                         }}
-                        className={`flex-1 bg-transparent text-sm border-none p-0 ${attr.isPk ? 'font-bold' : ''}`}
+                        className={`flex-1 bg-transparent text-sm border-none p-0 ${attr.isPk ? 'font-bold' : ''} ${theme === 'dark' ? 'text-slate-100 placeholder-slate-500' : 'text-slate-800'}`}
                       />
                       {attr.isPk && <span className="text-xs bg-red-100 text-red-700 px-1 rounded font-bold">PK</span>}
-                      <button onClick={() => deleteAttribute(true, selectedAssoc, attr.id)} className="text-gray-400 hover:text-red-500"><Trash2 size={14} /></button>
+                      <button onClick={() => deleteAttribute(true, selectedAssoc, attr.id)} className={`${theme === 'dark' ? 'text-slate-500 hover:text-red-400' : 'text-gray-400 hover:text-red-500'}`}><Trash2 size={14} /></button>
                     </div>
                   ))}
-                  {selectedAssoc.attributes.length === 0 && <p className="text-[10px] text-gray-400 italic">Ajoutez des propriétés pour faire une Entité-Association.</p>}
+                  {selectedAssoc.attributes.length === 0 && <p className={`text-[10px] italic ${theme === 'dark' ? 'text-slate-500' : 'text-gray-400'}`}>Ajoutez des propriétés pour faire une Entité-Association.</p>}
                 </div>
               </div>
             ) : (
               <div className="space-y-2 mt-4">
-                <h4 className="text-xs font-bold text-gray-700">Liste des relations</h4>
+                <h4 className={`text-xs font-bold ${theme === 'dark' ? 'text-slate-300' : 'text-gray-700'}`}>Liste des relations</h4>
                 {associations.map(a => (
                   <div
                     key={a.id}
-                    className="p-2 border rounded bg-white text-xs flex justify-between group"
+                    className={`p-2 border rounded text-xs flex justify-between group transition-colors ${theme === 'dark' ? 'bg-slate-700 border-slate-600 text-slate-100' : 'bg-white border-gray-200 text-slate-900'}`}
                   >
-                    <span>{a.label} <span className="text-gray-400">({a.connections.length} liens)</span></span>
+                    <span>{a.label} <span className={theme === 'dark' ? 'text-slate-400' : 'text-gray-400'}>({a.connections.length} liens)</span></span>
                   </div>
                 ))}
               </div>
