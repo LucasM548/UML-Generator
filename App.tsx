@@ -316,8 +316,10 @@ export default function App() {
   const handleSelect = (id: string | null, type: 'entity' | 'association' | null) => {
     setSelectedId(id);
     setSelectedType(type);
-    // Auto-focus on association label when selected
-    if (type === 'association' && id) {
+    // Auto-focus on name/label field when selected
+    if (type === 'entity' && id) {
+      setFocusField({ type: 'entity-name', id });
+    } else if (type === 'association' && id) {
       setFocusField({ type: 'association-label', id });
     }
   };
@@ -555,12 +557,10 @@ export default function App() {
         />
 
         <div className="absolute bottom-4 left-4 bg-white/90 p-3 rounded-lg shadow-md border border-slate-200 pointer-events-none">
-          <h4 className="font-bold text-sm text-slate-700 mb-1">Guide V2 (MCD)</h4>
+          <h4 className="font-bold text-sm text-slate-700 mb-1">Guide (MCD)</h4>
           <ul className="text-xs text-slate-600 space-y-1">
             <li>• Double-clic = créer entité.</li>
             <li>• Ctrl+Clic = relier entités.</li>
-            <li>• Glissez le libellé pour courber.</li>
-            <li>• + Propriétés = Entité-Association.</li>
           </ul>
         </div>
       </main>
