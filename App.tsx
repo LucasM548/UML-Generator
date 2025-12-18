@@ -122,8 +122,8 @@ export default function App() {
     const handleKeyDown = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement;
 
-      // For Delete/Backspace, check if we should delete the entity/association
-      if (e.key === 'Delete' || e.key === 'Backspace') {
+      // For Delete key (not Backspace), check if we should delete the entity/association
+      if (e.key === 'Delete') {
         // If in an input, only delete entity if ALL text is selected
         if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') {
           const input = target as HTMLInputElement;
@@ -169,6 +169,7 @@ export default function App() {
   }, [toast]);
 
   const handleAddEntity = (name: string) => {
+    saveToHistory();
     const newEntity: Entity = {
       id: crypto.randomUUID(),
       name,
@@ -185,6 +186,7 @@ export default function App() {
 
   // Create entity at specific position (for double-click)
   const handleCreateEntityAtPosition = (x: number, y: number) => {
+    saveToHistory();
     const newEntity: Entity = {
       id: crypto.randomUUID(),
       name: 'Nouvelle entité',
@@ -202,6 +204,7 @@ export default function App() {
 
   // Quick connect entities (for Ctrl+click)
   const handleQuickConnect = (sourceId: string, sourceType: 'entity' | 'association', targetEntityId: string) => {
+    saveToHistory();
     if (sourceType === 'entity') {
       // Create a new association between two entities
       const sourceEntity = entities.find(e => e.id === sourceId);
@@ -473,20 +476,30 @@ export default function App() {
       if (fill && colorReplacements[fill]) {
         element.setAttribute('fill', colorReplacements[fill]);
       }
-      // Replace stroke
+      // Replace stroke (but not for text elements using stroke for outline effect)
       const stroke = element.getAttribute('stroke');
-      if (stroke && colorReplacements[stroke]) {
+      if (stroke && colorReplacements[stroke] && element.tagName !== 'text') {
         element.setAttribute('stroke', colorReplacements[stroke]);
       }
       // Replace style attribute colors
       const style = element.getAttribute('style');
       if (style) {
         let newStyle = style;
+        // First, specifically handle text stroke (paint-order stroke) - convert dark to white
+        if (style.includes('paint-order')) {
+          // This is text with stroke outline - convert dark stroke to white
+          newStyle = newStyle.replace(/stroke:\s*#1e293b/g, 'stroke: white');
+        }
+        // Then apply other color replacements
         Object.entries(colorReplacements).forEach(([dark, light]) => {
-          newStyle = newStyle.replace(new RegExp(dark, 'g'), light);
+          // Don't replace #1e293b in style if it's already been handled as stroke
+          if (dark === '#1e293b' && newStyle.includes('paint-order')) {
+            // Only replace fill, not stroke
+            newStyle = newStyle.replace(new RegExp(`fill:\\s*${dark}`, 'g'), `fill: ${light}`);
+          } else {
+            newStyle = newStyle.replace(new RegExp(dark, 'g'), light);
+          }
         });
-        // Also ensure text strokes are white for light theme
-        newStyle = newStyle.replace(/stroke:\s*#1e293b/g, 'stroke: white');
         element.setAttribute('style', newStyle);
       }
       // Recurse to children
