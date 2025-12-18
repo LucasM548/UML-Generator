@@ -18,7 +18,7 @@ interface SidebarProps {
   onExportPng: () => void;
   onImport: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onClear: () => void;
-  focusField?: { type: 'entity-name' | 'association-label'; id: string } | null;
+  focusField?: { type: 'entity-name' | 'association-label' | 'cardinality'; id: string; connectionIndex?: number } | null;
   onFocusHandled?: () => void;
 }
 
@@ -68,6 +68,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
       } else if (focusField.type === 'association-label' && assocLabelRef.current) {
         assocLabelRef.current.focus();
         assocLabelRef.current.select();
+      } else if (focusField.type === 'cardinality' && focusField.connectionIndex !== undefined) {
+        // Focus on the cardinality input for the specific connection
+        const cardInputs = document.querySelectorAll(`[data-cardinality-assoc="${focusField.id}"]`);
+        const targetInput = cardInputs[focusField.connectionIndex] as HTMLInputElement;
+        if (targetInput) {
+          targetInput.focus();
+          targetInput.select();
+        }
       }
       onFocusHandled?.();
     }, 50);
@@ -391,6 +399,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                             list="card-options"
                             value={conn.cardinality}
                             onChange={(e) => updateConnection(selectedAssoc, conn.id, 'cardinality', e.target.value)}
+                            data-cardinality-assoc={selectedAssoc.id}
                             className={`flex-1 p-1 border rounded transition-colors ${theme === 'dark' ? 'bg-slate-600 border-slate-500 text-slate-100' : 'bg-white border-gray-300 text-slate-900'}`}
                           />
                         </div>

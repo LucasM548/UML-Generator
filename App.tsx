@@ -84,7 +84,7 @@ export default function App() {
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
   // Focus field state for auto-focus in Sidebar
-  const [focusField, setFocusField] = useState<{ type: 'entity-name' | 'association-label'; id: string } | null>(null);
+  const [focusField, setFocusField] = useState<{ type: 'entity-name' | 'association-label' | 'cardinality'; id: string; connectionIndex?: number } | null>(null);
 
   // Export modal state
   const [exportModal, setExportModal] = useState<{ blob: Blob; url: string } | null>(null);
@@ -657,6 +657,9 @@ export default function App() {
           onSelect={handleSelect}
           onCreateEntityAtPosition={handleCreateEntityAtPosition}
           onQuickConnect={handleQuickConnect}
+          onCardinalityClick={(assocId, connectionIndex) => {
+            setFocusField({ type: 'cardinality', id: assocId, connectionIndex });
+          }}
         />
 
         <div className={`absolute bottom-4 left-4 p-3 rounded-lg shadow-md border pointer-events-none transition-colors duration-300 ${theme === 'dark' ? 'bg-slate-800/90 border-slate-700' : 'bg-white/90 border-slate-200'}`}>

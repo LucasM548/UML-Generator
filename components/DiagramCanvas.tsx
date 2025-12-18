@@ -14,6 +14,7 @@ interface DiagramCanvasProps {
   onSelect: (id: string | null, type: 'entity' | 'association' | null) => void;
   onCreateEntityAtPosition?: (x: number, y: number) => void;
   onQuickConnect?: (sourceId: string, sourceType: 'entity' | 'association', targetEntityId: string) => void;
+  onCardinalityClick?: (associationId: string, connectionIndex: number) => void;
 }
 
 export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
@@ -25,6 +26,7 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
   onSelect,
   onCreateEntityAtPosition,
   onQuickConnect,
+  onCardinalityClick,
 }) => {
   const { theme } = useTheme();
   const [dragging, setDragging] = useState<{ id: string; type: 'entity' | 'association' | 'entityBox' } | null>(null);
@@ -385,8 +387,13 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
               fill: theme === 'dark' ? '#a78bfa' : '#7c3aed',
               fontSize: '13px',
               fontWeight: 'bold',
-              pointerEvents: 'none',
+              cursor: 'pointer',
               filter: theme === 'dark' ? 'none' : 'drop-shadow(0 0 1px rgba(124, 58, 237, 0.5))',
+            }}
+            onClick={(e) => {
+              e.stopPropagation();
+              onSelect(assoc.id, 'association');
+              onCardinalityClick?.(assoc.id, 0);
             }}
           >
             {assoc.connections[0].cardinality}
@@ -403,8 +410,13 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
               fill: theme === 'dark' ? '#a78bfa' : '#7c3aed',
               fontSize: '13px',
               fontWeight: 'bold',
-              pointerEvents: 'none',
+              cursor: 'pointer',
               filter: theme === 'dark' ? 'none' : 'drop-shadow(0 0 2px rgba(124, 58, 237, 0.5))',
+            }}
+            onClick={(e) => {
+              e.stopPropagation();
+              onSelect(assoc.id, 'association');
+              onCardinalityClick?.(assoc.id, 1);
             }}
           >
             {assoc.connections[1].cardinality}
@@ -535,8 +547,13 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
             fill: theme === 'dark' ? '#a78bfa' : '#7c3aed',
             fontSize: '13px',
             fontWeight: 'bold',
-            pointerEvents: 'none',
+            cursor: 'pointer',
             filter: theme === 'dark' ? 'none' : 'drop-shadow(0 0 2px rgba(124, 58, 237, 0.5))',
+          }}
+          onClick={(e) => {
+            e.stopPropagation();
+            onSelect(assoc.id, 'association');
+            onCardinalityClick?.(assoc.id, connIndex);
           }}
         >
           {conn.cardinality}
