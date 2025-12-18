@@ -65,7 +65,7 @@ export const AssociationNode: React.FC<AssociationNodeProps> = ({
           <line
             x1={association.x} y1={association.y}
             x2={boxCenterX} y2={boxCenterY}
-            stroke="black" strokeDasharray="4" strokeWidth="1"
+            stroke={theme === 'dark' ? '#94a3b8' : 'black'} strokeDasharray="4" strokeWidth="1"
             className="pointer-events-none"
           />
         )}
