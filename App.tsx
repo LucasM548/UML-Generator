@@ -771,7 +771,7 @@ export default function App() {
         />
 
         <div className={`absolute bottom-4 left-4 p-3 rounded-lg shadow-md border pointer-events-none transition-colors duration-300 ${theme === 'dark' ? 'bg-slate-800/90 border-slate-700' : 'bg-white/90 border-slate-200'}`}>
-          <h4 className={`font-bold text-sm mb-1 ${theme === 'dark' ? 'text-slate-200' : 'text-slate-700'}`}>Guide (MCD)</h4>
+          <h4 className={`font-bold text-sm mb-1 ${theme === 'dark' ? 'text-slate-200' : 'text-slate-700'}`}>Guide </h4>
           <ul className={`text-xs space-y-1 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
             <li>• Double-clic = créer entité.</li>
             <li>• Shift+Glisser = créer association.</li>

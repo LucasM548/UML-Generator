@@ -343,11 +343,264 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
     }
   };
 
+  // Render self-referencing (reflexive) association with angular path
+  const renderSelfReferencingConnection = (assoc: Association, entity1: import('../types').Entity) => {
+    const { width, height } = getEntityDimensions(entity1);
+    const entityCenterX = entity1.x + width / 2;
+    const entityCenterY = entity1.y + height / 2;
+
+    // Find all self-referencing associations for this entity to offset multiple ones
+    const selfRefAssocs = associations.filter(a => {
+      if (a.connections.length !== 2) return false;
+      return a.connections[0].entityId === entity1.id && a.connections[1].entityId === entity1.id;
+    });
+    const selfRefIndex = selfRefAssocs.findIndex(a => a.id === assoc.id);
+    const loopOffset = selfRefIndex * 40;
+
+    // Default label position (right side when not movable)
+    const defaultExtendX = entity1.x + width + 50 + loopOffset;
+    const defaultLabelX = defaultExtendX + 5;
+    const defaultLabelY = entityCenterY;
+
+    // Actual label position
+    const labelX = assoc.isLabelMovable ? assoc.x : defaultLabelX;
+    const labelY = assoc.isLabelMovable ? assoc.y : defaultLabelY;
+
+    let simplePathD: string;
+    let card1X: number, card1Y: number, card2X: number, card2Y: number;
+
+    if (assoc.isLabelMovable) {
+      // Calculate label center for connection points
+      // The label text width is approximately: label.length * 8 (character width)
+      const labelWidth = assoc.label.length * 8;
+      const labelCenterX = labelX + labelWidth / 2;
+      const labelCenterY = labelY;
+
+      // Calculate dynamic connection points based on label center position
+      const dx = labelCenterX - entityCenterX;
+      const dy = labelCenterY - entityCenterY;
+
+      // Calculate two connection points on entity border
+      const angle = Math.atan2(dy, dx);
+      const offsetAngle = 0.3; // ~17 degrees offset
+
+      // Get intersection points for both lines
+      const getEntityBorderPoint = (ang: number) => {
+        const cosA = Math.cos(ang);
+        const sinA = Math.sin(ang);
+        const hw = width / 2;
+        const hh = height / 2;
+
+        const tx = hw / Math.abs(cosA);
+        const ty = hh / Math.abs(sinA);
+        const t = Math.min(tx, ty);
+
+        return {
+          x: entityCenterX + t * cosA,
+          y: entityCenterY + t * sinA
+        };
+      };
+
+      const start = getEntityBorderPoint(angle - offsetAngle);
+      const end = getEntityBorderPoint(angle + offsetAngle);
+
+      // Angular path with corner points - connect to label CENTER
+      const corner1X = (start.x + labelCenterX) / 2 + (labelCenterY - start.y) * 0.3;
+      const corner1Y = (start.y + labelCenterY) / 2 - (labelCenterX - start.x) * 0.3;
+      const corner2X = (end.x + labelCenterX) / 2 - (labelCenterY - end.y) * 0.3;
+      const corner2Y = (end.y + labelCenterY) / 2 + (labelCenterX - end.x) * 0.3;
+
+      // Draw angular paths with corners - connecting to label center
+      simplePathD = `M ${start.x} ${start.y} L ${corner1X} ${corner1Y} L ${labelCenterX} ${labelCenterY} M ${labelCenterX} ${labelCenterY} L ${corner2X} ${corner2Y} L ${end.x} ${end.y}`;
+
+      // Cardinality positions on first segment
+      card1X = corner1X;
+      card1Y = corner1Y - 10;
+      card2X = corner2X;
+      card2Y = corner2Y + 10;
+    } else {
+      // Fixed angular bracket path (right side)
+      const startX = entity1.x + width;
+      const startY = entityCenterY - 15;
+      const endX = entity1.x + width;
+      const endY = entityCenterY + 15;
+      const extendX = defaultExtendX;
+
+      simplePathD = `M ${startX} ${startY} L ${extendX} ${startY} L ${extendX} ${endY} L ${endX} ${endY}`;
+
+      card1X = (startX + extendX) / 2;
+      card1Y = startY - 8;
+      card2X = (startX + extendX) / 2;
+      card2Y = endY + 15;
+    }
+
+    const isSelected = selectedItems.has(assoc.id);
+    const hasAttributes = assoc.attributes && assoc.attributes.length > 0;
+
+    return (
+      <g
+        key={`${assoc.id}-self-ref`}
+        onMouseDown={(e) => {
+          e.stopPropagation();
+          e.preventDefault();
+          if (e.shiftKey) {
+            setConnectionMode({ sourceId: assoc.id, sourceType: 'association' });
+            onSelect(assoc.id, 'association');
+            return;
+          }
+          if (e.ctrlKey || e.metaKey) {
+            onSelect(assoc.id, 'association', { ctrlKey: true });
+            return;
+          }
+          if (!selectedItems.has(assoc.id)) {
+            onSelect(assoc.id, 'association');
+          }
+          // Enable dragging if isLabelMovable is true
+          if (assoc.isLabelMovable && svgRef.current) {
+            const rect = svgRef.current.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
+            setOffset({ x: mouseX - assoc.x, y: mouseY - assoc.y });
+            setLastPos({ x: mouseX, y: mouseY });
+            setDragging({ id: assoc.id, type: 'association', startX: assoc.x, startY: assoc.y });
+          }
+        }}
+        style={{ cursor: assoc.isLabelMovable ? 'move' : 'pointer' }}
+      >
+        {/* Invisible path for clicking */}
+        <path d={simplePathD} stroke="transparent" strokeWidth="15" fill="none" />
+        {/* Visible angular path */}
+        <path
+          d={simplePathD}
+          stroke={isSelected ? "#3b82f6" : (theme === 'dark' ? '#94a3b8' : 'black')}
+          strokeWidth={isSelected ? 2.5 : 1.5}
+          fill="none"
+        />
+        {/* Selection highlight */}
+        {isSelected && (
+          <rect
+            x={labelX - 5} y={labelY - 12}
+            width={assoc.label.length * 8 + 10} height={24}
+            fill="#dbeafe" stroke="#3b82f6" strokeWidth={2} rx={4}
+          />
+        )}
+        {/* Label */}
+        <text
+          x={labelX} y={labelY + 4} textAnchor="start"
+          style={{
+            paintOrder: 'stroke',
+            stroke: theme === 'dark' ? '#1e293b' : 'white',
+            strokeWidth: '4px',
+            fill: isSelected ? '#3b82f6' : (theme === 'dark' ? '#f1f5f9' : 'black'),
+            fontSize: '13px', fontWeight: 'bold',
+          }}
+        >
+          {assoc.label}
+        </text>
+        {/* Cardinality 1 */}
+        <text
+          x={card1X} y={card1Y} textAnchor="middle"
+          style={{
+            paintOrder: 'stroke', stroke: theme === 'dark' ? '#1e293b' : 'white',
+            strokeWidth: '5px', fill: theme === 'dark' ? '#a78bfa' : '#7c3aed',
+            fontSize: '13px', fontWeight: 'bold', cursor: 'pointer',
+          }}
+          onClick={(e) => { e.stopPropagation(); onSelect(assoc.id, 'association'); onCardinalityClick?.(assoc.id, 0); }}
+        >
+          {assoc.connections[0].cardinality}
+        </text>
+        {/* Cardinality 2 */}
+        <text
+          x={card2X} y={card2Y} textAnchor="middle"
+          style={{
+            paintOrder: 'stroke', stroke: theme === 'dark' ? '#1e293b' : 'white',
+            strokeWidth: '5px', fill: theme === 'dark' ? '#a78bfa' : '#7c3aed',
+            fontSize: '13px', fontWeight: 'bold', cursor: 'pointer',
+          }}
+          onClick={(e) => { e.stopPropagation(); onSelect(assoc.id, 'association'); onCardinalityClick?.(assoc.id, 1); }}
+        >
+          {assoc.connections[1].cardinality}
+        </text>
+        {/* Entity box for associations with attributes */}
+        {hasAttributes && (() => {
+          const displayName = assoc.entityName && assoc.entityName.trim() !== '' ? assoc.entityName : assoc.label;
+          const headerHeight = 30;
+          const rowHeight = 24;
+          const charWidth = 8;
+          const nameWidth = displayName.length * charWidth + 20;
+          const maxAttrWidth = assoc.attributes.reduce((max, attr) => {
+            const attrText = (attr.isPk ? 'PK ' : '') + attr.name;
+            return Math.max(max, attrText.length * charWidth + 20);
+          }, 0);
+          const boxWidth = Math.max(140, nameWidth, maxAttrWidth);
+          const boxHeight = Math.max(40, headerHeight + assoc.attributes.length * rowHeight + 5);
+
+          const defaultBoxX = defaultExtendX + 20;
+          const defaultBoxY = labelY - boxHeight / 2;
+          const boxX = assoc.entityBoxX !== undefined ? assoc.entityBoxX : defaultBoxX;
+          const boxY = assoc.entityBoxY !== undefined ? assoc.entityBoxY : defaultBoxY;
+          const boxCenterX = boxX + boxWidth / 2;
+          const boxCenterY = boxY + boxHeight / 2;
+
+          // Calculate label center for the dashed line
+          const labelCenterForLine = labelX + (assoc.label.length * 8) / 2;
+
+          return (
+            <>
+              {/* Dashed line connecting label CENTER to entity box */}
+              <line
+                x1={labelCenterForLine} y1={labelY}
+                x2={boxCenterX} y2={boxCenterY}
+                stroke={theme === 'dark' ? '#94a3b8' : 'black'} strokeDasharray="4" strokeWidth="1"
+                className="pointer-events-none"
+              />
+              <g
+                transform={`translate(${boxX}, ${boxY})`}
+                onMouseDown={(e) => { e.stopPropagation(); handleEntityBoxMouseDown(e, assoc.id); }}
+                className="cursor-move"
+              >
+                <rect width={boxWidth} height={boxHeight} fill={theme === 'dark' ? '#1e293b' : 'white'}
+                  stroke={isSelected ? "#3b82f6" : (theme === 'dark' ? '#475569' : '#000')} strokeWidth={1.5} rx={4} />
+                <rect width={boxWidth} height={headerHeight} fill={theme === 'dark' ? '#334155' : '#f3f4f6'}
+                  stroke={theme === 'dark' ? '#475569' : '#000'} strokeWidth={1} rx={4} />
+                <rect y={headerHeight - 5} width={boxWidth} height={5} fill={theme === 'dark' ? '#334155' : '#f3f4f6'} />
+                <line x1={0} y1={headerHeight} x2={boxWidth} y2={headerHeight} stroke={theme === 'dark' ? '#475569' : 'black'} strokeWidth={1} />
+                <text x={boxWidth / 2} y={20} textAnchor="middle" className={`font-bold text-sm pointer-events-none ${theme === 'dark' ? 'fill-slate-100' : 'fill-slate-900'}`}>{displayName}</text>
+                {assoc.attributes.map((attr, index) => (
+                  <text key={attr.id} x={10} y={headerHeight + 20 + index * rowHeight}
+                    className={`text-xs pointer-events-none ${attr.isPk ? 'font-bold underline' : ''} ${theme === 'dark' ? 'fill-slate-200' : 'fill-slate-800'}`}>
+                    {attr.name}
+                    {attr.isPk && <tspan className="fill-red-500"> PK</tspan>}
+                  </text>
+                ))}
+              </g>
+            </>
+          );
+        })()}
+      </g>
+    );
+  };
+
   // Render a connection between an Association (Source) and an Entity (Target)
   const renderConnection = (assoc: Association, connIndex: number) => {
     const conn = assoc.connections[connIndex];
     const entity = entities.find(e => e.id === conn.entityId);
     if (!entity) return null;
+
+    // Early detection of self-referencing associations (same entity for both connections)
+    // This applies regardless of isLabelMovable setting
+    if (assoc.connections.length === 2) {
+      const ent1 = entities.find(e => e.id === assoc.connections[0].entityId);
+      const ent2 = entities.find(e => e.id === assoc.connections[1].entityId);
+
+      if (ent1 && ent2 && ent1.id === ent2.id) {
+        // Only render once (on first connection)
+        if (connIndex !== 0) return null;
+
+        // Render self-referencing association with angular path
+        return renderSelfReferencingConnection(assoc, ent1);
+      }
+    }
 
     // For binary associations that are locked, we'll render a direct line between entities
     // The label will be rendered separately at the center
@@ -363,155 +616,8 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
       // Only render the line once (on the first connection)
       if (connIndex !== 0) return null;
 
-      // Check for self-referencing (reflexive) association
-      const isSelfReferencing = entity1.id === entity2.id;
-
-      if (isSelfReferencing) {
-        // Draw a curved loop for self-referencing association
-        const { width, height } = getEntityDimensions(entity1);
-        const entityRight = entity1.x + width;
-        const entityTop = entity1.y;
-        const entityCenterY = entity1.y + height / 2;
-
-        // Find all self-referencing associations for this entity to offset multiple ones
-        const selfRefAssocs = associations.filter(a => {
-          if (a.connections.length !== 2 || a.isLabelMovable) return false;
-          return a.connections[0].entityId === entity1.id && a.connections[1].entityId === entity1.id;
-        });
-        const selfRefIndex = selfRefAssocs.findIndex(a => a.id === assoc.id);
-        const loopOffset = selfRefIndex * 35;
-
-        // Loop parameters - exit from right side, loop around top-right
-        const startX = entityRight;
-        const startY = entityCenterY - 15;
-        const endX = entityRight;
-        const endY = entityCenterY + 15;
-
-        // Control points for bezier curve (loop to the right and up)
-        const loopSize = 50 + loopOffset;
-        const ctrlX1 = entityRight + loopSize;
-        const ctrlY1 = startY - loopSize;
-        const ctrlX2 = entityRight + loopSize;
-        const ctrlY2 = endY + loopSize;
-
-        // Label position at the rightmost point of the loop
-        const labelX = entityRight + loopSize + 5;
-        const labelY = entityCenterY;
-
-        // Cardinality positions
-        const card1X = startX + 15;
-        const card1Y = startY - 10;
-        const card2X = endX + 15;
-        const card2Y = endY + 15;
-
-        const isSelected = selectedItems.has(assoc.id);
-
-        return (
-          <g
-            key={`${assoc.id}-self-ref`}
-            onMouseDown={(e) => {
-              e.stopPropagation();
-              e.preventDefault();
-              if (e.ctrlKey || e.metaKey) {
-                onSelect(assoc.id, 'association', { ctrlKey: true });
-                return;
-              }
-              if (!selectedItems.has(assoc.id)) {
-                onSelect(assoc.id, 'association');
-              }
-            }}
-            style={{ cursor: 'pointer' }}
-          >
-            {/* Wider invisible path for easier clicking */}
-            <path
-              d={`M ${startX} ${startY} C ${ctrlX1} ${ctrlY1}, ${ctrlX2} ${ctrlY2}, ${endX} ${endY}`}
-              stroke="transparent"
-              strokeWidth="15"
-              fill="none"
-            />
-            {/* Visible curved path */}
-            <path
-              d={`M ${startX} ${startY} C ${ctrlX1} ${ctrlY1}, ${ctrlX2} ${ctrlY2}, ${endX} ${endY}`}
-              stroke={isSelected ? "#3b82f6" : (theme === 'dark' ? '#94a3b8' : 'black')}
-              strokeWidth={isSelected ? 2.5 : 1.5}
-              fill="none"
-            />
-            {/* Selection highlight behind label */}
-            {isSelected && (
-              <rect
-                x={labelX - 40}
-                y={labelY - 12}
-                width={80}
-                height={24}
-                fill="#dbeafe"
-                stroke="#3b82f6"
-                strokeWidth={2}
-                rx={4}
-              />
-            )}
-            {/* Label at the loop */}
-            <text
-              x={labelX}
-              y={labelY + 4}
-              textAnchor="middle"
-              style={{
-                paintOrder: 'stroke',
-                stroke: theme === 'dark' ? '#1e293b' : 'white',
-                strokeWidth: '4px',
-                fill: isSelected ? '#3b82f6' : (theme === 'dark' ? '#f1f5f9' : 'black'),
-                fontSize: '13px',
-                fontWeight: 'bold',
-              }}
-            >
-              {assoc.label}
-            </text>
-            {/* Cardinality 1 */}
-            <text
-              x={card1X}
-              y={card1Y}
-              textAnchor="middle"
-              style={{
-                paintOrder: 'stroke',
-                stroke: theme === 'dark' ? '#1e293b' : 'white',
-                strokeWidth: '5px',
-                fill: theme === 'dark' ? '#a78bfa' : '#7c3aed',
-                fontSize: '13px',
-                fontWeight: 'bold',
-                cursor: 'pointer',
-              }}
-              onClick={(e) => {
-                e.stopPropagation();
-                onSelect(assoc.id, 'association');
-                onCardinalityClick?.(assoc.id, 0);
-              }}
-            >
-              {assoc.connections[0].cardinality}
-            </text>
-            {/* Cardinality 2 */}
-            <text
-              x={card2X}
-              y={card2Y}
-              textAnchor="middle"
-              style={{
-                paintOrder: 'stroke',
-                stroke: theme === 'dark' ? '#1e293b' : 'white',
-                strokeWidth: '5px',
-                fill: theme === 'dark' ? '#a78bfa' : '#7c3aed',
-                fontSize: '13px',
-                fontWeight: 'bold',
-                cursor: 'pointer',
-              }}
-              onClick={(e) => {
-                e.stopPropagation();
-                onSelect(assoc.id, 'association');
-                onCardinalityClick?.(assoc.id, 1);
-              }}
-            >
-              {assoc.connections[1].cardinality}
-            </text>
-          </g>
-        );
-      }
+      // Note: Self-referencing associations are now handled by early detection above
+      // So we only reach here for normal binary associations between different entities
 
       // Find all locked binary associations between the same pair of entities
       const pairKey = [entity1.id, entity2.id].sort().join('-');
@@ -874,9 +980,18 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
         assoc.connections.map((_, idx) => renderConnection(assoc, idx))
       )}
 
-      {/* Render Associations (Nodes) - skip locked binary associations */}
+      {/* Render Associations (Nodes) - skip locked binary associations AND self-referencing binary associations */}
       {associations
-        .filter(assoc => !(assoc.connections.length === 2 && !assoc.isLabelMovable))
+        .filter(assoc => {
+          // Skip locked binary associations (they are rendered inline)
+          if (assoc.connections.length === 2 && !assoc.isLabelMovable) return false;
+          // Skip self-referencing binary associations (they are rendered by renderSelfReferencingConnection)
+          if (assoc.connections.length === 2) {
+            const isSelfRef = assoc.connections[0].entityId === assoc.connections[1].entityId;
+            if (isSelfRef) return false;
+          }
+          return true;
+        })
         .map((assoc) => (
           <AssociationNode
             key={assoc.id}
