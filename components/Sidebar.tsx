@@ -90,6 +90,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [newlyAddedAttrId, setNewlyAddedAttrId] = useState<string | null>(null);
   const newAttrInputRef = useRef<HTMLInputElement>(null);
 
+  // Drag-and-drop state for attribute reordering
+  const [draggedAttrId, setDraggedAttrId] = useState<string | null>(null);
+  const [dragOverAttrId, setDragOverAttrId] = useState<string | null>(null);
+
   // Helpers for Attributes
   const handleAddAttribute = (isAssoc: boolean, obj: Entity | Association) => {
     const newAttrId = crypto.randomUUID();
@@ -101,6 +105,24 @@ export const Sidebar: React.FC<SidebarProps> = ({
     }
     // Set the ID for auto-focus
     setNewlyAddedAttrId(newAttrId);
+  };
+
+  // Reorder attributes via drag-and-drop
+  const reorderAttributes = (isAssoc: boolean, obj: Entity | Association, fromId: string, toId: string) => {
+    if (fromId === toId) return;
+    const attrs = [...obj.attributes];
+    const fromIndex = attrs.findIndex(a => a.id === fromId);
+    const toIndex = attrs.findIndex(a => a.id === toId);
+    if (fromIndex === -1 || toIndex === -1) return;
+
+    const [movedAttr] = attrs.splice(fromIndex, 1);
+    attrs.splice(toIndex, 0, movedAttr);
+
+    if (isAssoc) {
+      onUpdateAssociation({ ...obj as Association, attributes: attrs });
+    } else {
+      onUpdateEntity({ ...obj as Entity, attributes: attrs });
+    }
   };
 
   // Auto-focus on newly added attribute
@@ -283,7 +305,42 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     <button onClick={() => handleAddAttribute(false, selectedEntity)} className={`text-xs px-2 py-0.5 rounded ${theme === 'dark' ? 'bg-green-900/50 text-green-400' : 'bg-green-100 text-green-700'}`}>+ Ajouter</button>
                   </div>
                   {selectedEntity.attributes.map((attr, index) => (
-                    <div key={attr.id} className={`flex gap-1 items-center p-1 rounded border transition-colors ${theme === 'dark' ? 'bg-slate-700 border-slate-600' : 'bg-gray-50 border-gray-200'}`}>
+                    <div
+                      key={attr.id}
+                      draggable
+                      onDragStart={(e) => {
+                        setDraggedAttrId(attr.id);
+                        e.dataTransfer.effectAllowed = 'move';
+                      }}
+                      onDragEnd={() => {
+                        setDraggedAttrId(null);
+                        setDragOverAttrId(null);
+                      }}
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        if (draggedAttrId && draggedAttrId !== attr.id) {
+                          setDragOverAttrId(attr.id);
+                        }
+                      }}
+                      onDragLeave={() => setDragOverAttrId(null)}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        if (draggedAttrId && draggedAttrId !== attr.id) {
+                          reorderAttributes(false, selectedEntity, draggedAttrId, attr.id);
+                        }
+                        setDraggedAttrId(null);
+                        setDragOverAttrId(null);
+                      }}
+                      className={`flex gap-1 items-center p-1 rounded border transition-all ${draggedAttrId === attr.id ? 'opacity-50' : ''
+                        } ${dragOverAttrId === attr.id ? 'border-blue-500 border-2' : ''
+                        } ${theme === 'dark' ? 'bg-slate-700 border-slate-600' : 'bg-gray-50 border-gray-200'}`}
+                    >
+                      <span
+                        className={`cursor-grab active:cursor-grabbing select-none px-0.5 ${theme === 'dark' ? 'text-slate-500 hover:text-slate-300' : 'text-gray-400 hover:text-gray-600'}`}
+                        title="Glisser pour réordonner"
+                      >
+                        ⠿
+                      </span>
                       <input type="checkbox" checked={attr.isPk} onChange={(e) => updateAttribute(false, selectedEntity, attr.id, 'isPk', e.target.checked)} className="accent-red-500" title="Clé primaire" />
                       <input
                         type="text"
@@ -417,7 +474,42 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     <button onClick={() => handleAddAttribute(true, selectedAssoc)} className={`text-xs px-2 py-0.5 rounded ${theme === 'dark' ? 'bg-green-900/50 text-green-400' : 'bg-green-100 text-green-700'}`}>+ Ajouter</button>
                   </div>
                   {selectedAssoc.attributes.map(attr => (
-                    <div key={attr.id} className={`flex gap-1 items-center p-1 rounded border transition-colors ${theme === 'dark' ? 'bg-slate-700 border-slate-600' : 'bg-gray-50 border-gray-200'}`}>
+                    <div
+                      key={attr.id}
+                      draggable
+                      onDragStart={(e) => {
+                        setDraggedAttrId(attr.id);
+                        e.dataTransfer.effectAllowed = 'move';
+                      }}
+                      onDragEnd={() => {
+                        setDraggedAttrId(null);
+                        setDragOverAttrId(null);
+                      }}
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        if (draggedAttrId && draggedAttrId !== attr.id) {
+                          setDragOverAttrId(attr.id);
+                        }
+                      }}
+                      onDragLeave={() => setDragOverAttrId(null)}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        if (draggedAttrId && draggedAttrId !== attr.id) {
+                          reorderAttributes(true, selectedAssoc, draggedAttrId, attr.id);
+                        }
+                        setDraggedAttrId(null);
+                        setDragOverAttrId(null);
+                      }}
+                      className={`flex gap-1 items-center p-1 rounded border transition-all ${draggedAttrId === attr.id ? 'opacity-50' : ''
+                        } ${dragOverAttrId === attr.id ? 'border-blue-500 border-2' : ''
+                        } ${theme === 'dark' ? 'bg-slate-700 border-slate-600' : 'bg-gray-50 border-gray-200'}`}
+                    >
+                      <span
+                        className={`cursor-grab active:cursor-grabbing select-none px-0.5 ${theme === 'dark' ? 'text-slate-500 hover:text-slate-300' : 'text-gray-400 hover:text-gray-600'}`}
+                        title="Glisser pour réordonner"
+                      >
+                        ⠿
+                      </span>
                       <input type="checkbox" checked={attr.isPk} onChange={(e) => updateAttribute(true, selectedAssoc, attr.id, 'isPk', e.target.checked)} className="accent-red-500" title="Clé primaire" />
                       <input
                         type="text"
