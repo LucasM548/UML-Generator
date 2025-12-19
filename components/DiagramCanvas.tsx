@@ -86,8 +86,8 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
     const mouseX = e.clientX - rect.left;
     const mouseY = e.clientY - rect.top;
 
-    // Ctrl+Click/Drag: Start connection mode (original behavior)
-    if (e.ctrlKey || e.metaKey) {
+    // Shift+Click/Drag: Start connection mode
+    if (e.shiftKey) {
       if (type === 'entity') {
         setConnectionMode({ sourceId: id, sourceType: 'entity' });
         onSelect(id, type);
@@ -103,9 +103,9 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
       }
     }
 
-    // Shift+Click: toggle selection (add/remove from multi-selection)
-    if (e.shiftKey) {
-      onSelect(id, type, { ctrlKey: true }); // reusing ctrlKey option for toggle
+    // Ctrl+Click: toggle selection (add/remove from multi-selection)
+    if (e.ctrlKey || e.metaKey) {
+      onSelect(id, type, { ctrlKey: true });
       return;
     }
 
@@ -147,9 +147,9 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
     const mouseX = e.clientX - rect.left;
     const mouseY = e.clientY - rect.top;
 
-    // Shift+Click: toggle selection (add/remove from multi-selection)
-    if (e.shiftKey) {
-      onSelect(id, 'association', { ctrlKey: true }); // reusing ctrlKey option for toggle
+    // Ctrl+Click: toggle selection (add/remove from multi-selection)
+    if (e.ctrlKey || e.metaKey) {
+      onSelect(id, 'association', { ctrlKey: true });
       return;
     }
 
@@ -569,14 +569,14 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
           onMouseDown={(e) => {
             e.stopPropagation();
             e.preventDefault();
-            // Ctrl+Click: start connection mode to add entity to this association
-            if (e.ctrlKey || e.metaKey) {
+            // Shift+Click: start connection mode to add entity to this association
+            if (e.shiftKey) {
               setConnectionMode({ sourceId: assoc.id, sourceType: 'association' });
               onSelect(assoc.id, 'association');
               return;
             }
-            // Shift+Click: toggle selection
-            if (e.shiftKey) {
+            // Ctrl+Click: toggle selection
+            if (e.ctrlKey || e.metaKey) {
               onSelect(assoc.id, 'association', { ctrlKey: true });
               return;
             }

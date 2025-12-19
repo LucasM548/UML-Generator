@@ -774,8 +774,8 @@ export default function App() {
           <h4 className={`font-bold text-sm mb-1 ${theme === 'dark' ? 'text-slate-200' : 'text-slate-700'}`}>Guide (MCD)</h4>
           <ul className={`text-xs space-y-1 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
             <li>• Double-clic = créer entité.</li>
-            <li>• Ctrl+Glisser = créer association.</li>
-            <li>• Shift+Clic = sélection multiple.</li>
+            <li>• Shift+Glisser = créer association.</li>
+            <li>• Ctrl+Clic = sélection multiple.</li>
             <li>• Glisser sur le canvas = sélection rectangulaire.</li>
           </ul>
         </div>
