@@ -8,10 +8,14 @@ import { useTheme } from './ThemeContext';
 interface DiagramCanvasProps {
   entities: Entity[];
   associations: Association[];
-  onMove: (id: string, x: number, y: number, type: 'entity' | 'association') => void;
+  onMove: (id: string, x: number, y: number, type: 'entity' | 'association', deltaX?: number, deltaY?: number) => void;
   onMoveEntityBox: (id: string, x: number, y: number) => void;
-  selectedId: string | null;
-  onSelect: (id: string | null, type: 'entity' | 'association' | null) => void;
+  selectedItems: Map<string, 'entity' | 'association'>;
+  onSelect: (
+    id: string | null,
+    type: 'entity' | 'association' | null,
+    options?: { ctrlKey?: boolean; setSelection?: Map<string, 'entity' | 'association'> }
+  ) => void;
   onCreateEntityAtPosition?: (x: number, y: number) => void;
   onQuickConnect?: (sourceId: string, sourceType: 'entity' | 'association', targetEntityId: string) => void;
   onCardinalityClick?: (associationId: string, connectionIndex: number) => void;
@@ -22,16 +26,19 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
   associations,
   onMove,
   onMoveEntityBox,
-  selectedId,
+  selectedItems,
   onSelect,
   onCreateEntityAtPosition,
   onQuickConnect,
   onCardinalityClick,
 }) => {
   const { theme } = useTheme();
-  const [dragging, setDragging] = useState<{ id: string; type: 'entity' | 'association' | 'entityBox' } | null>(null);
+  const [dragging, setDragging] = useState<{ id: string; type: 'entity' | 'association' | 'entityBox'; startX: number; startY: number } | null>(null);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
   const svgRef = useRef<SVGSVGElement>(null);
+
+  // Last mouse position for calculating delta
+  const [lastPos, setLastPos] = useState({ x: 0, y: 0 });
 
   // Connection mode state for Ctrl+Drag linking
   const [connectionMode, setConnectionMode] = useState<{
@@ -39,6 +46,9 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
     sourceType: 'entity' | 'association';
   } | null>(null);
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
+
+  // Marquee selection state
+  const [marquee, setMarquee] = useState<{ startX: number; startY: number; endX: number; endY: number } | null>(null);
 
   // Cancel connection mode with Escape key or when Ctrl is released
   useEffect(() => {
@@ -72,26 +82,23 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
 
     if (!obj || !svgRef.current) return;
 
-    // Handle Ctrl+Drag for connection mode - start dragging to connect
+    const rect = svgRef.current.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+
+    // Ctrl+Click: toggle selection without starting drag
     if (e.ctrlKey || e.metaKey) {
-      // Start connection mode from entity or association
-      if (type === 'entity') {
-        setConnectionMode({ sourceId: id, sourceType: 'entity' });
-        onSelect(id, type);
-        return;
-      } else if (type === 'association') {
-        const assoc = obj as import('../types').Association;
-        // Only allow adding connections to n-ary associations (not binary locked)
-        if (assoc.connections.length >= 2) {
-          setConnectionMode({ sourceId: id, sourceType: 'association' });
-          onSelect(id, type);
-          return;
-        }
-      }
+      onSelect(id, type, { ctrlKey: true });
+      return;
     }
 
-    // Always select the item
-    onSelect(id, type);
+    // Windows-like behavior:
+    // - If clicking an already-selected item: keep selection, prepare for multi-drag
+    // - If clicking an unselected item: select only this item
+    const isAlreadySelected = selectedItems.has(id);
+    if (!isAlreadySelected) {
+      onSelect(id, type);
+    }
 
     // For binary associations, check if label is movable
     if (type === 'association') {
@@ -102,31 +109,37 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
       }
     }
 
-    // For entities, x/y is top-left. For associations, x/y is center.
-    const rect = svgRef.current.getBoundingClientRect();
-    const mouseX = e.clientX - rect.left;
-    const mouseY = e.clientY - rect.top;
-
+    // Setup for dragging (single or multi)
     setOffset({
       x: mouseX - obj.x,
       y: mouseY - obj.y,
     });
-    setDragging({ id, type });
+    setLastPos({ x: mouseX, y: mouseY });
+    setDragging({ id, type, startX: obj.x, startY: obj.y });
   };
 
   // Handler for dragging the entity box of an association
   const handleEntityBoxMouseDown = (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
+    e.preventDefault();
 
     const assoc = associations.find(a => a.id === id);
     if (!assoc || !svgRef.current) return;
 
-    // Select the association
-    onSelect(id, 'association');
-
     const rect = svgRef.current.getBoundingClientRect();
     const mouseX = e.clientX - rect.left;
     const mouseY = e.clientY - rect.top;
+
+    // Ctrl+Click: toggle selection
+    if (e.ctrlKey || e.metaKey) {
+      onSelect(id, 'association', { ctrlKey: true });
+      return;
+    }
+
+    // Windows-like: only change selection if not already selected
+    if (!selectedItems.has(id)) {
+      onSelect(id, 'association');
+    }
 
     // Get current entity box position (or calculate default)
     const isBinary = assoc.connections.length <= 2;
@@ -140,37 +153,102 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
       x: mouseX - boxX,
       y: mouseY - boxY,
     });
-    setDragging({ id, type: 'entityBox' });
+    setLastPos({ x: mouseX, y: mouseY });
+    setDragging({ id, type: 'entityBox', startX: boxX, startY: boxY });
   };
 
   const handleMouseMove = (e: React.MouseEvent) => {
-    // Always track mouse position for connection mode
-    if (svgRef.current) {
-      const rect = svgRef.current.getBoundingClientRect();
-      setMousePos({
-        x: e.clientX - rect.left,
-        y: e.clientY - rect.top,
-      });
-    }
-
-    if (!dragging || !svgRef.current) return;
+    if (!svgRef.current) return;
 
     const rect = svgRef.current.getBoundingClientRect();
-    const x = e.clientX - rect.left - offset.x;
-    const y = e.clientY - rect.top - offset.y;
+    const currentX = e.clientX - rect.left;
+    const currentY = e.clientY - rect.top;
+
+    // Always track mouse position for connection mode
+    setMousePos({ x: currentX, y: currentY });
+
+    // Update marquee if active
+    if (marquee) {
+      setMarquee(prev => prev ? { ...prev, endX: currentX, endY: currentY } : null);
+      return;
+    }
+
+    if (!dragging) return;
+
+    const x = currentX - offset.x;
+    const y = currentY - offset.y;
 
     const snap = 10;
     const snappedX = Math.round(x / snap) * snap;
     const snappedY = Math.round(y / snap) * snap;
 
+    // Calculate delta based on snapped movement from start position
+    // This ensures all elements move by the exact same amount
+    const deltaX = snappedX - dragging.startX;
+    const deltaY = snappedY - dragging.startY;
+
     if (dragging.type === 'entityBox') {
       onMoveEntityBox(dragging.id, snappedX, snappedY);
     } else {
-      onMove(dragging.id, snappedX, snappedY, dragging.type);
+      // Pass delta for multi-drag support
+      onMove(dragging.id, snappedX, snappedY, dragging.type, deltaX, deltaY);
     }
   };
 
   const handleMouseUp = (e: React.MouseEvent) => {
+    // Finalize marquee selection
+    if (marquee && svgRef.current) {
+      const minX = Math.min(marquee.startX, marquee.endX);
+      const maxX = Math.max(marquee.startX, marquee.endX);
+      const minY = Math.min(marquee.startY, marquee.endY);
+      const maxY = Math.max(marquee.startY, marquee.endY);
+
+      // Only process if marquee has some size (not just a click)
+      if (maxX - minX > 5 || maxY - minY > 5) {
+        const newSelection = new Map<string, 'entity' | 'association'>();
+
+        // Find entities inside marquee
+        entities.forEach(entity => {
+          const { width, height } = getEntityDimensions(entity);
+          const entityCenterX = entity.x + width / 2;
+          const entityCenterY = entity.y + height / 2;
+
+          if (entityCenterX >= minX && entityCenterX <= maxX &&
+            entityCenterY >= minY && entityCenterY <= maxY) {
+            newSelection.set(entity.id, 'entity');
+          }
+        });
+
+        // Find associations inside marquee
+        // For associations, check if the center point OR any part overlaps
+        associations.forEach(assoc => {
+          // For n-ary associations (diamond shape), use a bounding box around center
+          // Diamond is roughly 60x40 for simple, larger for n-ary
+          const assocHalfWidth = assoc.connections.length > 2 ? 40 : 30;
+          const assocHalfHeight = assoc.connections.length > 2 ? 30 : 20;
+
+          // Check if association bounding box intersects with marquee
+          const assocLeft = assoc.x - assocHalfWidth;
+          const assocRight = assoc.x + assocHalfWidth;
+          const assocTop = assoc.y - assocHalfHeight;
+          const assocBottom = assoc.y + assocHalfHeight;
+
+          // Intersection check: not (completely left OR right OR above OR below)
+          const intersects = !(assocRight < minX || assocLeft > maxX ||
+            assocBottom < minY || assocTop > maxY);
+
+          if (intersects) {
+            newSelection.set(assoc.id, 'association');
+          }
+        });
+
+        onSelect(null, null, { setSelection: newSelection });
+      }
+
+      setMarquee(null);
+      return;
+    }
+
     // If in connection mode, check if we're over an entity to complete the connection
     if (connectionMode && svgRef.current) {
       const rect = svgRef.current.getBoundingClientRect();
@@ -198,8 +276,24 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
     setDragging(null);
   };
 
+  // Start marquee selection on canvas mousedown (not on items)
+  const handleCanvasMouseDown = (e: React.MouseEvent) => {
+    // If clicking on empty area, start marquee or clear selection
+    if (svgRef.current) {
+      const rect = svgRef.current.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+
+      // Start marquee selection
+      setMarquee({ startX: x, startY: y, endX: x, endY: y });
+    }
+  };
+
   const handleCanvasClick = (e: React.MouseEvent) => {
-    onSelect(null, null);
+    // Only clear selection if no marquee was drawn
+    if (!marquee) {
+      onSelect(null, null);
+    }
   };
 
   const handleCanvasDoubleClick = (e: React.MouseEvent) => {
@@ -300,7 +394,7 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
       // Cardinality positions near each entity
       const card1Pos = getLabelPosition(finalBorder1, finalBorder2, 15);
       const card2Pos = getLabelPosition(finalBorder2, finalBorder1, 15);
-      const isSelected = selectedId === assoc.id;
+      const isSelected = selectedItems.has(assoc.id);
 
       return (
         <g
@@ -308,13 +402,15 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
           onMouseDown={(e) => {
             e.stopPropagation();
             e.preventDefault();
-            // Handle Ctrl+Drag to add connection to this binary association
+            // Ctrl+Click: toggle selection
             if (e.ctrlKey || e.metaKey) {
-              setConnectionMode({ sourceId: assoc.id, sourceType: 'association' });
-              onSelect(assoc.id, 'association');
+              onSelect(assoc.id, 'association', { ctrlKey: true });
               return;
             }
-            onSelect(assoc.id, 'association');
+            // Windows-like: only change selection if not already selected
+            if (!selectedItems.has(assoc.id)) {
+              onSelect(assoc.id, 'association');
+            }
           }}
           style={{ cursor: 'pointer' }}
         >
@@ -557,11 +653,11 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
   return (
     <svg
       ref={svgRef}
-      className={`w-full h-full overflow-hidden select-none transition-colors duration-300 ${connectionMode ? 'cursor-crosshair' : 'cursor-default'} ${theme === 'dark' ? 'bg-slate-800' : 'bg-slate-50'}`}
+      className={`w-full h-full overflow-hidden select-none transition-colors duration-300 ${connectionMode ? 'cursor-crosshair' : marquee ? 'cursor-crosshair' : 'cursor-default'} ${theme === 'dark' ? 'bg-slate-800' : 'bg-slate-50'}`}
       style={{ userSelect: 'none', WebkitUserSelect: 'none' }}
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
-      onMouseDown={handleCanvasClick}
+      onMouseDown={handleCanvasMouseDown}
       onDoubleClick={handleCanvasDoubleClick}
     >
       <defs>
@@ -585,6 +681,21 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
         />
       )}
 
+      {/* Render marquee selection rectangle */}
+      {marquee && (
+        <rect
+          x={Math.min(marquee.startX, marquee.endX)}
+          y={Math.min(marquee.startY, marquee.endY)}
+          width={Math.abs(marquee.endX - marquee.startX)}
+          height={Math.abs(marquee.endY - marquee.startY)}
+          fill="rgba(59, 130, 246, 0.1)"
+          stroke="#3b82f6"
+          strokeWidth="1"
+          strokeDasharray="4 2"
+          className="pointer-events-none"
+        />
+      )}
+
       {/* Render Connections (Lines) first */}
       {associations.map(assoc =>
         assoc.connections.map((_, idx) => renderConnection(assoc, idx))
@@ -599,7 +710,7 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
             association={assoc}
             onMouseDown={(e, id) => handleMouseDown(e, id, 'association')}
             onEntityBoxMouseDown={handleEntityBoxMouseDown}
-            isSelected={selectedId === assoc.id}
+            isSelected={selectedItems.has(assoc.id)}
           />
         ))}
 
@@ -609,7 +720,7 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
           key={entity.id}
           entity={entity}
           onMouseDown={(e, id) => handleMouseDown(e, id, 'entity')}
-          isSelected={selectedId === entity.id}
+          isSelected={selectedItems.has(entity.id)}
         />
       ))}
     </svg>

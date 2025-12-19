@@ -77,8 +77,8 @@ export default function App() {
   const [entities, setEntities] = useState<Entity[]>(initialEntities);
   const [associations, setAssociations] = useState<Association[]>(initialAssociations);
 
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [selectedType, setSelectedType] = useState<'entity' | 'association' | null>(null);
+  // Multi-selection: Map of id -> type for all selected items
+  const [selectedItems, setSelectedItems] = useState<Map<string, 'entity' | 'association'>>(new Map());
 
   // Toast notification state
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
@@ -112,8 +112,7 @@ export default function App() {
     setEntities(previousState.entities);
     setAssociations(previousState.associations);
     setHistory(prev => prev.slice(0, -1));
-    setSelectedId(null);
-    setSelectedType(null);
+    setSelectedItems(new Map());
     setToast({ message: "Annulé", type: 'success' });
   };
 
@@ -134,17 +133,37 @@ export default function App() {
           if (!isAllSelected) return;
         }
 
-        if (selectedId && selectedType) {
+        if (selectedItems.size > 0) {
           e.preventDefault();
           // Blur any focused input before deleting
           if (document.activeElement instanceof HTMLElement) {
             document.activeElement.blur();
           }
-          if (selectedType === 'entity') {
-            handleDeleteEntityDirect(selectedId);
-          } else {
-            handleDeleteAssociationDirect(selectedId);
-          }
+          // Delete all selected items
+          saveToHistory();
+          selectedItems.forEach((type, id) => {
+            if (type === 'entity') {
+              setEntities(prev => prev.filter(e => e.id !== id));
+              // Also update associations that reference this entity
+              setAssociations(prevAssocs => {
+                return prevAssocs.reduce((acc, assoc) => {
+                  const isConnected = assoc.connections.some(c => c.entityId === id);
+                  if (!isConnected) {
+                    acc.push(assoc);
+                  } else if (assoc.connections.length > 2) {
+                    acc.push({
+                      ...assoc,
+                      connections: assoc.connections.filter(c => c.entityId !== id)
+                    });
+                  }
+                  return acc;
+                }, [] as Association[]);
+              });
+            } else {
+              setAssociations(prev => prev.filter(a => a.id !== id));
+            }
+          });
+          setSelectedItems(new Map());
         }
       }
 
@@ -158,7 +177,7 @@ export default function App() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedId, selectedType, entities, associations, history]);
+  }, [selectedItems, entities, associations, history]);
 
   // Auto-hide toast after 3 seconds
   useEffect(() => {
@@ -180,8 +199,7 @@ export default function App() {
       attributes: []
     };
     setEntities(prev => [...prev, newEntity]);
-    setSelectedId(newEntity.id);
-    setSelectedType('entity');
+    setSelectedItems(new Map([[newEntity.id, 'entity']]));
   };
 
   // Create entity at specific position (for double-click)
@@ -197,8 +215,7 @@ export default function App() {
       attributes: []
     };
     setEntities(prev => [...prev, newEntity]);
-    setSelectedId(newEntity.id);
-    setSelectedType('entity');
+    setSelectedItems(new Map([[newEntity.id, 'entity']]));
     setFocusField({ type: 'entity-name', id: newEntity.id });
   };
 
@@ -227,8 +244,7 @@ export default function App() {
         ]
       };
       setAssociations(prev => [...prev, newAssoc]);
-      setSelectedId(newAssoc.id);
-      setSelectedType('association');
+      setSelectedItems(new Map([[newAssoc.id, 'association']]));
       setFocusField({ type: 'association-label', id: newAssoc.id });
     } else {
       // Add a connection to an existing association
@@ -246,8 +262,7 @@ export default function App() {
         ]
       };
       setAssociations(prev => prev.map(a => a.id === sourceId ? updatedAssoc : a));
-      setSelectedId(sourceId);
-      setSelectedType('association');
+      setSelectedItems(new Map([[sourceId, 'association']]));
       setFocusField({ type: 'association-label', id: sourceId });
     }
   };
@@ -286,8 +301,11 @@ export default function App() {
       }, [] as Association[]);
     });
 
-    setSelectedId(null);
-    setSelectedType(null);
+    setSelectedItems(prev => {
+      const next = new Map(prev);
+      next.delete(id);
+      return next;
+    });
   };
 
   // Delete from sidebar button (no confirmation now)
@@ -299,8 +317,7 @@ export default function App() {
     saveToHistory();
     const newAssoc = { ...assoc, id: crypto.randomUUID() };
     setAssociations(prev => [...prev, newAssoc]);
-    setSelectedId(newAssoc.id);
-    setSelectedType('association');
+    setSelectedItems(new Map([[newAssoc.id, 'association']]));
   };
 
   const handleUpdateAssociation = (updated: Association) => {
@@ -312,21 +329,82 @@ export default function App() {
   const handleDeleteAssociationDirect = (id: string) => {
     saveToHistory();
     setAssociations(prev => prev.filter(a => a.id !== id));
-    setSelectedId(null);
-    setSelectedType(null);
+    setSelectedItems(prev => {
+      const next = new Map(prev);
+      next.delete(id);
+      return next;
+    });
   };
 
   const handleDeleteAssociation = (id: string) => {
     handleDeleteAssociationDirect(id);
   };
 
-  const handleMove = (id: string, x: number, y: number, type: 'entity' | 'association') => {
-    if (type === 'entity') {
-      setEntities(prev => prev.map(e => e.id === id ? { ...e, x, y } : e));
+  // Store initial positions when multi-drag starts
+  const [dragStartPositions, setDragStartPositions] = useState<Map<string, { x: number; y: number; entityBoxX?: number; entityBoxY?: number }> | null>(null);
+
+  // Multi-move: when one selected item is moved, move all selected items by the same delta
+  const handleMove = (id: string, x: number, y: number, type: 'entity' | 'association', deltaX?: number, deltaY?: number) => {
+    // If delta is provided and there are multiple selected items, move all selected
+    if (deltaX !== undefined && deltaY !== undefined && selectedItems.size > 1 && selectedItems.has(id)) {
+      // Initialize start positions on first move
+      if (!dragStartPositions) {
+        const startPos = new Map<string, { x: number; y: number; entityBoxX?: number; entityBoxY?: number }>();
+        entities.forEach(e => {
+          if (selectedItems.has(e.id)) {
+            startPos.set(e.id, { x: e.x, y: e.y });
+          }
+        });
+        associations.forEach(a => {
+          if (selectedItems.has(a.id)) {
+            startPos.set(a.id, { x: a.x, y: a.y, entityBoxX: a.entityBoxX, entityBoxY: a.entityBoxY });
+          }
+        });
+        setDragStartPositions(startPos);
+      }
+
+      // Move all selected entities using absolute delta from their start positions
+      setEntities(prev => prev.map(e => {
+        if (selectedItems.get(e.id) === 'entity') {
+          const startPos = dragStartPositions?.get(e.id) || { x: e.x - deltaX, y: e.y - deltaY };
+          return { ...e, x: startPos.x + deltaX, y: startPos.y + deltaY };
+        }
+        return e;
+      }));
+
+      // Move all selected associations (including their entity box if it exists)
+      setAssociations(prev => prev.map(a => {
+        if (selectedItems.get(a.id) === 'association') {
+          const startPos = dragStartPositions?.get(a.id) || { x: a.x - deltaX, y: a.y - deltaY };
+          const updated: typeof a = { ...a, x: startPos.x + deltaX, y: startPos.y + deltaY };
+          // Also move the entity box if it has custom position
+          if (startPos.entityBoxX !== undefined) {
+            updated.entityBoxX = startPos.entityBoxX + deltaX;
+          }
+          if (startPos.entityBoxY !== undefined) {
+            updated.entityBoxY = startPos.entityBoxY + deltaY;
+          }
+          return updated;
+        }
+        return a;
+      }));
     } else {
-      setAssociations(prev => prev.map(a => a.id === id ? { ...a, x, y } : a));
+      // Single item move - clear start positions
+      if (dragStartPositions) {
+        setDragStartPositions(null);
+      }
+      if (type === 'entity') {
+        setEntities(prev => prev.map(e => e.id === id ? { ...e, x, y } : e));
+      } else {
+        setAssociations(prev => prev.map(a => a.id === id ? { ...a, x, y } : a));
+      }
     }
   };
+
+  // Clear drag start positions when selection changes or drag ends
+  useEffect(() => {
+    setDragStartPositions(null);
+  }, [selectedItems]);
 
   const handleMoveEntityBox = (id: string, x: number, y: number) => {
     setAssociations(prev => prev.map(a =>
@@ -334,10 +412,42 @@ export default function App() {
     ));
   };
 
-  const handleSelect = (id: string | null, type: 'entity' | 'association' | null) => {
-    setSelectedId(id);
-    setSelectedType(type);
-    // Auto-focus on name/label field when selected
+  // Multi-selection handler: supports single click, Ctrl+click toggle, and marquee set
+  const handleSelect = (
+    id: string | null,
+    type: 'entity' | 'association' | null,
+    options?: { ctrlKey?: boolean; setSelection?: Map<string, 'entity' | 'association'> }
+  ) => {
+    // If setting selection from marquee
+    if (options?.setSelection) {
+      setSelectedItems(options.setSelection);
+      return;
+    }
+
+    // Clicking empty canvas: clear selection
+    if (id === null) {
+      setSelectedItems(new Map());
+      return;
+    }
+
+    // Ctrl+click: toggle selection
+    if (options?.ctrlKey) {
+      setSelectedItems(prev => {
+        const next = new Map(prev);
+        if (next.has(id)) {
+          next.delete(id);
+        } else {
+          next.set(id, type!);
+        }
+        return next;
+      });
+      return;
+    }
+
+    // Normal click: single select
+    setSelectedItems(new Map([[id, type!]]));
+
+    // Auto-focus on name/label field when single-selected
     if (type === 'entity' && id) {
       setFocusField({ type: 'entity-name', id });
     } else if (type === 'association' && id) {
@@ -597,8 +707,7 @@ export default function App() {
     if (window.confirm("Voulez-vous vraiment effacer tout le diagramme ?")) {
       setEntities([]);
       setAssociations([]);
-      setSelectedId(null);
-      setSelectedType(null);
+      setSelectedItems(new Map());
     }
   };
 
@@ -621,8 +730,7 @@ export default function App() {
         if (Array.isArray(data.entities) && Array.isArray(data.associations)) {
           setEntities(data.entities);
           setAssociations(data.associations);
-          setSelectedId(null);
-          setSelectedType(null);
+          setSelectedItems(new Map());
           setToast({ message: "Import réussi !", type: 'success' });
         } else {
           setToast({ message: "Format de fichier invalide.", type: 'error' });
@@ -653,7 +761,7 @@ export default function App() {
           associations={associations}
           onMove={handleMove}
           onMoveEntityBox={handleMoveEntityBox}
-          selectedId={selectedId}
+          selectedItems={selectedItems}
           onSelect={handleSelect}
           onCreateEntityAtPosition={handleCreateEntityAtPosition}
           onQuickConnect={handleQuickConnect}
@@ -666,7 +774,8 @@ export default function App() {
           <h4 className={`font-bold text-sm mb-1 ${theme === 'dark' ? 'text-slate-200' : 'text-slate-700'}`}>Guide (MCD)</h4>
           <ul className={`text-xs space-y-1 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
             <li>• Double-clic = créer entité.</li>
-            <li>• Ctrl+Clic = relier entités.</li>
+            <li>• Ctrl+Clic = sélection multiple.</li>
+            <li>• Glisser sur le canvas = sélection rectangulaire.</li>
           </ul>
         </div>
       </main>
@@ -680,8 +789,7 @@ export default function App() {
         onAddAssociation={handleAddAssociation}
         onUpdateAssociation={handleUpdateAssociation}
         onDeleteAssociation={handleDeleteAssociation}
-        selectedId={selectedId}
-        selectedType={selectedType}
+        selectedItems={selectedItems}
         onExportPng={handleExportPng}
         onExport={handleExport}
         onImport={handleImport}

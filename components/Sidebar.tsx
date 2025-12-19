@@ -12,8 +12,7 @@ interface SidebarProps {
   onAddAssociation: (assoc: Omit<Association, 'id'>) => void;
   onUpdateAssociation: (assoc: Association) => void;
   onDeleteAssociation: (id: string) => void;
-  selectedId: string | null;
-  selectedType: 'entity' | 'association' | null;
+  selectedItems: Map<string, 'entity' | 'association'>;
   onExport: () => void;
   onExportPng: () => void;
   onImport: (e: React.ChangeEvent<HTMLInputElement>) => void;
@@ -31,8 +30,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onAddAssociation,
   onUpdateAssociation,
   onDeleteAssociation,
-  selectedId,
-  selectedType,
+  selectedItems,
   onExport,
   onExportPng,
   onImport,
@@ -48,14 +46,21 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const entityNameRef = useRef<HTMLInputElement>(null);
   const assocLabelRef = useRef<HTMLInputElement>(null);
 
+  // Derive single selection from multi-selection for edit panel
+  const selectedId = selectedItems.size === 1 ? Array.from(selectedItems.keys())[0] : null;
+  const selectedType = selectedId ? selectedItems.get(selectedId) : null;
+
   // Auto-switch tab when selecting an item on the canvas
   useEffect(() => {
-    if (selectedType === 'entity') {
-      setActiveTab('entities');
-    } else if (selectedType === 'association') {
-      setActiveTab('associations');
+    if (selectedItems.size === 1) {
+      const type = Array.from(selectedItems.values())[0];
+      if (type === 'entity') {
+        setActiveTab('entities');
+      } else if (type === 'association') {
+        setActiveTab('associations');
+      }
     }
-  }, [selectedId, selectedType]);
+  }, [selectedItems]);
 
   // Handle focusField prop for auto-focus
   useEffect(() => {
@@ -361,6 +366,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     </div>
                   ))}
                 </div>
+              </div>
+            ) : selectedItems.size > 1 ? (
+              <div className={`text-center mt-10 p-4 rounded-lg border ${theme === 'dark' ? 'bg-blue-900/30 border-blue-700 text-blue-300' : 'bg-blue-50 border-blue-200 text-blue-700'}`}>
+                <p className="font-semibold">{selectedItems.size} éléments sélectionnés</p>
+                <p className="text-xs mt-1 opacity-75">Glissez pour déplacer ensemble</p>
               </div>
             ) : (
               <p className={`text-center text-xs mt-10 ${theme === 'dark' ? 'text-slate-500' : 'text-gray-400'}`}>Sélectionnez une entité pour éditer.</p>
