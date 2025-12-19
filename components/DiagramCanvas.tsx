@@ -370,27 +370,26 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
     let card1X: number, card1Y: number, card2X: number, card2Y: number;
 
     if (assoc.isLabelMovable) {
-      // Calculate label center for connection points
-      // The label text width is approximately: label.length * 8 (character width)
-      const labelWidth = assoc.label.length * 8;
-      const labelCenterX = labelX + labelWidth / 2;
-      const labelCenterY = labelY;
-
-      // Calculate dynamic connection points based on label center position
-      const dx = labelCenterX - entityCenterX;
-      const dy = labelCenterY - entityCenterY;
+      // Calculate dynamic connection points based on label position
+      // Determine which side of the entity the label is on
+      const dx = labelX - entityCenterX;
+      const dy = labelY - entityCenterY;
 
       // Calculate two connection points on entity border
+      // Point 1: offset slightly up from center direction
+      // Point 2: offset slightly down from center direction
       const angle = Math.atan2(dy, dx);
       const offsetAngle = 0.3; // ~17 degrees offset
 
       // Get intersection points for both lines
       const getEntityBorderPoint = (ang: number) => {
+        // Calculate point on entity border in direction of angle
         const cosA = Math.cos(ang);
         const sinA = Math.sin(ang);
         const hw = width / 2;
         const hh = height / 2;
 
+        // Check which edge we hit
         const tx = hw / Math.abs(cosA);
         const ty = hh / Math.abs(sinA);
         const t = Math.min(tx, ty);
@@ -404,20 +403,28 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
       const start = getEntityBorderPoint(angle - offsetAngle);
       const end = getEntityBorderPoint(angle + offsetAngle);
 
-      // Angular path with corner points - connect to label CENTER
-      const corner1X = (start.x + labelCenterX) / 2 + (labelCenterY - start.y) * 0.3;
-      const corner1Y = (start.y + labelCenterY) / 2 - (labelCenterX - start.x) * 0.3;
-      const corner2X = (end.x + labelCenterX) / 2 - (labelCenterY - end.y) * 0.3;
-      const corner2Y = (end.y + labelCenterY) / 2 + (labelCenterX - end.x) * 0.3;
+      // Angular path with one corner point
+      // Calculate a corner point between entity and label
+      const corner1X = (start.x + labelX) / 2 + (labelY - start.y) * 0.3;
+      const corner1Y = (start.y + labelY) / 2 - (labelX - start.x) * 0.3;
+      const corner2X = (end.x + labelX) / 2 - (labelY - end.y) * 0.3;
+      const corner2Y = (end.y + labelY) / 2 + (labelX - end.x) * 0.3;
 
-      // Draw angular paths with corners - connecting to label center
-      simplePathD = `M ${start.x} ${start.y} L ${corner1X} ${corner1Y} L ${labelCenterX} ${labelCenterY} M ${labelCenterX} ${labelCenterY} L ${corner2X} ${corner2Y} L ${end.x} ${end.y}`;
+      // Draw angular paths with corners
+      simplePathD = `M ${start.x} ${start.y} L ${corner1X} ${corner1Y} L ${labelX} ${labelY} M ${labelX} ${labelY} L ${corner2X} ${corner2Y} L ${end.x} ${end.y}`;
 
-      // Cardinality positions on first segment
-      card1X = corner1X;
-      card1Y = corner1Y - 10;
-      card2X = corner2X;
-      card2Y = corner2Y + 10;
+      // Cardinality positions near entity (at start and end points)
+      // Offset them outward from entity center
+      const offset = 18;
+      const dir1X = (start.x - entityCenterX) / Math.hypot(start.x - entityCenterX, start.y - entityCenterY);
+      const dir1Y = (start.y - entityCenterY) / Math.hypot(start.x - entityCenterX, start.y - entityCenterY);
+      const dir2X = (end.x - entityCenterX) / Math.hypot(end.x - entityCenterX, end.y - entityCenterY);
+      const dir2Y = (end.y - entityCenterY) / Math.hypot(end.x - entityCenterX, end.y - entityCenterY);
+
+      card1X = start.x + dir1X * offset;
+      card1Y = start.y + dir1Y * offset;
+      card2X = end.x + dir2X * offset;
+      card2Y = end.y + dir2Y * offset;
     } else {
       // Fixed angular bracket path (right side)
       const startX = entity1.x + width;
@@ -542,14 +549,11 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
           const boxCenterX = boxX + boxWidth / 2;
           const boxCenterY = boxY + boxHeight / 2;
 
-          // Calculate label center for the dashed line
-          const labelCenterForLine = labelX + (assoc.label.length * 8) / 2;
-
           return (
             <>
-              {/* Dashed line connecting label CENTER to entity box */}
+              {/* Dashed line connecting label to entity box */}
               <line
-                x1={labelCenterForLine} y1={labelY}
+                x1={labelX} y1={labelY}
                 x2={boxCenterX} y2={boxCenterY}
                 stroke={theme === 'dark' ? '#94a3b8' : 'black'} strokeDasharray="4" strokeWidth="1"
                 className="pointer-events-none"
