@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Entity, Association } from '../types';
 import { EntityBox } from './EntityBox';
 import { AssociationNode } from './AssociationNode';
-import { getCenter, getIntersection, getPolygonIntersection, getAssociationShapePoints, getLabelPosition } from '../utils/geometry';
+import { getCenter, getIntersection, getPolygonIntersection, getAssociationShapePoints, getLabelPosition, getEntityDimensions } from '../utils/geometry';
 import { useTheme } from './ThemeContext';
 
 interface DiagramCanvasProps {
@@ -179,18 +179,8 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
 
       // Find entity under mouse position
       const targetEntity = entities.find(entity => {
-        // Calculate entity dimensions (same as EntityBox component)
-        const headerHeight = 30;
-        const rowHeight = 24;
-        const padding = 10;
-        const charWidth = 8;
-        const entityNameWidth = entity.name.length * charWidth + 20;
-        const maxAttrWidth = entity.attributes.reduce((max, attr) => {
-          const attrText = (attr.isPk ? 'PK ' : '') + attr.name;
-          return Math.max(max, attrText.length * charWidth + 20);
-        }, 0);
-        const width = Math.max(entity.width, entityNameWidth, maxAttrWidth, 120);
-        const height = Math.max(entity.height, headerHeight + (entity.attributes.length * rowHeight) + padding);
+        // Use the same dimension calculation as EntityBox and geometry utils
+        const { width, height } = getEntityDimensions(entity);
 
         return mouseX >= entity.x && mouseX <= entity.x + width &&
           mouseY >= entity.y && mouseY <= entity.y + height;

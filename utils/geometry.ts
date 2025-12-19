@@ -3,15 +3,30 @@ import { Entity, Point, Association } from '../types';
 // Constants for entity sizing (must match EntityBox.tsx)
 const HEADER_HEIGHT = 30;
 const ROW_HEIGHT = 24;
-const PADDING = 10;
-const CHAR_WIDTH = 8;
+const PADDING = 20;
+
+// Helper function to measure text width using Canvas API
+const measureTextWidth = (text: string, font: string): number => {
+  const canvas = document.createElement('canvas');
+  const context = canvas.getContext('2d');
+  if (!context) return text.length * 8; // Fallback
+  context.font = font;
+  return context.measureText(text).width;
+};
 
 // Calculate the actual rendered dimensions of an entity
 export const getEntityDimensions = (entity: Entity): { width: number; height: number } => {
-  const entityNameWidth = entity.name.length * CHAR_WIDTH + 20;
+  const normalFont = '14px ui-sans-serif, system-ui, sans-serif';
+  const boldFont = 'bold 14px ui-sans-serif, system-ui, sans-serif';
+
+  // Measure entity name (bold, centered)
+  const entityNameWidth = measureTextWidth(entity.name, boldFont) + PADDING;
+
+  // Measure all attributes
   const maxAttrWidth = entity.attributes.reduce((max, attr) => {
-    const attrText = (attr.isPk ? 'PK ' : '') + attr.name;
-    return Math.max(max, attrText.length * CHAR_WIDTH + 20);
+    const font = attr.isPk ? boldFont : normalFont;
+    const attrText = attr.name + (attr.isPk ? ' PK' : '');
+    return Math.max(max, measureTextWidth(attrText, font) + PADDING);
   }, 0);
 
   const width = Math.max(entity.width, entityNameWidth, maxAttrWidth, 120);
