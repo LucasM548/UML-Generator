@@ -359,7 +359,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                             handleAddAttribute(false, selectedEntity);
                           }
                         }}
-                        className={`flex-1 bg-transparent text-sm border-none p-0 ${attr.isPk ? 'font-bold' : ''} ${theme === 'dark' ? 'text-slate-100 placeholder-slate-500' : 'text-slate-800'}`}
+                        className={`flex-1 bg-transparent text-sm border-none p-0 min-w-0 ${attr.isPk ? 'font-bold' : ''} ${theme === 'dark' ? 'text-slate-100 placeholder-slate-500' : 'text-slate-800'}`}
                       />
                       {attr.isPk && <span className="text-xs bg-red-100 text-red-700 px-1 rounded font-bold">PK</span>}
                       <button onClick={() => deleteAttribute(false, selectedEntity, attr.id)} className={`${theme === 'dark' ? 'text-slate-500 hover:text-red-400' : 'text-gray-400 hover:text-red-500'}`}><Trash2 size={14} /></button>
