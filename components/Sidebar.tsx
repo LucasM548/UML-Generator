@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Entity, Attribute, Association, Connection } from '../types';
 import { Plus, Trash2, ArrowRightLeft, Database, Download, Upload, XCircle, Image, Sun, Moon } from 'lucide-react';
 import { useTheme } from './ThemeContext';
-import { AttributeItem } from './AttributeItem';
+import { AttributeList } from './AttributeList';
 
 interface SidebarProps {
   entities: Entity[];
@@ -305,47 +305,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   />
                 </div>
 
-                <div className="space-y-2">
-                  <div className="flex justify-between items-center">
-                    <label className={`text-xs font-bold uppercase ${theme === 'dark' ? 'text-slate-400' : 'text-gray-500'}`}>Attributs</label>
-                    <button onClick={() => handleAddAttribute(false, selectedEntity)} className={`text-xs px-2 py-0.5 rounded ${theme === 'dark' ? 'bg-green-900/50 text-green-400' : 'bg-green-100 text-green-700'}`}>+ Ajouter</button>
-                  </div>
-                  {selectedEntity.attributes.map((attr, index) => (
-                    <AttributeItem
-                      key={attr.id}
-                      attr={attr}
-                      theme={theme}
-                      onUpdate={(id, field, value) => updateAttribute(false, selectedEntity, id, field, value)}
-                      onDelete={(id) => deleteAttribute(false, selectedEntity, id)}
-                      onAddNext={() => handleAddAttribute(false, selectedEntity)}
-                      onDragStart={(e, id) => {
-                        setDraggedAttrId(id);
-                        e.dataTransfer.effectAllowed = 'move';
-                      }}
-                      onDragEnd={() => {
-                        setDraggedAttrId(null);
-                        setDragOverAttrId(null);
-                      }}
-                      onDragOver={(e, id) => {
-                        e.preventDefault();
-                        if (draggedAttrId && draggedAttrId !== id) {
-                          setDragOverAttrId(id);
-                        }
-                      }}
-                      onDrop={(e, id) => {
-                        e.preventDefault();
-                        if (draggedAttrId && draggedAttrId !== id) {
-                          reorderAttributes(false, selectedEntity, draggedAttrId, id);
-                        }
-                        setDraggedAttrId(null);
-                        setDragOverAttrId(null);
-                      }}
-                      isDragging={draggedAttrId === attr.id}
-                      isDragOver={dragOverAttrId === attr.id}
-                      autoFocus={attr.id === newlyAddedAttrId}
-                    />
-                  ))}
-                </div>
+                <AttributeList
+                  attributes={selectedEntity.attributes}
+                  onUpdate={(id, field, value) => updateAttribute(false, selectedEntity, id, field, value)}
+                  onDelete={(id) => deleteAttribute(false, selectedEntity, id)}
+                  onAdd={() => handleAddAttribute(false, selectedEntity)}
+                  onReorder={(fromId, toId) => reorderAttributes(false, selectedEntity, fromId, toId)}
+                  newlyAddedAttrId={newlyAddedAttrId}
+                  theme={theme}
+                />
               </div>
             ) : selectedItems.size > 1 ? (
               <div className={`text-center mt-10 p-4 rounded-lg border ${theme === 'dark' ? 'bg-blue-900/30 border-blue-700 text-blue-300' : 'bg-blue-50 border-blue-200 text-blue-700'}`}>
@@ -459,45 +427,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 </div>
 
                 <div className={`space-y-2 pt-2 border-t ${theme === 'dark' ? 'border-slate-700' : 'border-gray-200'}`}>
-                  <div className="flex justify-between items-center">
-                    <label className={`text-xs font-bold uppercase ${theme === 'dark' ? 'text-slate-400' : 'text-gray-500'}`}>Propriétés</label>
-                    <button onClick={() => handleAddAttribute(true, selectedAssoc)} className={`text-xs px-2 py-0.5 rounded ${theme === 'dark' ? 'bg-green-900/50 text-green-400' : 'bg-green-100 text-green-700'}`}>+ Ajouter</button>
-                  </div>
-                  {selectedAssoc.attributes.map(attr => (
-                    <AttributeItem
-                      key={attr.id}
-                      attr={attr}
-                      theme={theme}
-                      onUpdate={(id, field, value) => updateAttribute(true, selectedAssoc, id, field, value)}
-                      onDelete={(id) => deleteAttribute(true, selectedAssoc, id)}
-                      onAddNext={() => handleAddAttribute(true, selectedAssoc)}
-                      onDragStart={(e, id) => {
-                        setDraggedAttrId(id);
-                        e.dataTransfer.effectAllowed = 'move';
-                      }}
-                      onDragEnd={() => {
-                        setDraggedAttrId(null);
-                        setDragOverAttrId(null);
-                      }}
-                      onDragOver={(e, id) => {
-                        e.preventDefault();
-                        if (draggedAttrId && draggedAttrId !== id) {
-                          setDragOverAttrId(id);
-                        }
-                      }}
-                      onDrop={(e, id) => {
-                        e.preventDefault();
-                        if (draggedAttrId && draggedAttrId !== id) {
-                          reorderAttributes(true, selectedAssoc, draggedAttrId, id);
-                        }
-                        setDraggedAttrId(null);
-                        setDragOverAttrId(null);
-                      }}
-                      isDragging={draggedAttrId === attr.id}
-                      isDragOver={dragOverAttrId === attr.id}
-                      autoFocus={attr.id === newlyAddedAttrId}
-                    />
-                  ))}
+                  <AttributeList
+                    attributes={selectedAssoc.attributes}
+                    onUpdate={(id, field, value) => updateAttribute(true, selectedAssoc, id, field, value)}
+                    onDelete={(id) => deleteAttribute(true, selectedAssoc, id)}
+                    onAdd={() => handleAddAttribute(true, selectedAssoc)}
+                    onReorder={(fromId, toId) => reorderAttributes(true, selectedAssoc, fromId, toId)}
+                    newlyAddedAttrId={newlyAddedAttrId}
+                    theme={theme}
+                    label="Propriétés"
+                  />
                   {selectedAssoc.attributes.length === 0 && <p className={`text-[10px] italic ${theme === 'dark' ? 'text-slate-500' : 'text-gray-400'}`}>Ajoutez des propriétés pour faire une Entité-Association.</p>}
                 </div>
               </div>
