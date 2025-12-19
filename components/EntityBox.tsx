@@ -52,6 +52,7 @@ export const EntityBox: React.FC<EntityBoxProps> = ({ entity, onMouseDown, isSel
     <g
       transform={`translate(${entity.x}, ${entity.y})`}
       onMouseDown={(e) => onMouseDown(e, entity.id)}
+      onClick={(e) => e.stopPropagation()}
       className="cursor-move select-none"
     >
       {/* Shadow/Selection effect */}

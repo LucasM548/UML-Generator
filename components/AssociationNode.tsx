@@ -58,6 +58,7 @@ export const AssociationNode: React.FC<AssociationNodeProps> = ({
       {/* Main association shape - draggable */}
       <g
         onMouseDown={(e) => onMouseDown(e, association.id)}
+        onClick={(e) => e.stopPropagation()}
         className="cursor-move"
       >
         {/* Dashed line connecting shape to attribute box */}
@@ -112,6 +113,7 @@ export const AssociationNode: React.FC<AssociationNodeProps> = ({
               onEntityBoxMouseDown(e, association.id);
             }
           }}
+          onClick={(e) => e.stopPropagation()}
           className="cursor-move"
         >
           {/* Shadow/BG */}

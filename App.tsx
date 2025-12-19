@@ -80,6 +80,9 @@ export default function App() {
   // Multi-selection: Map of id -> type for all selected items
   const [selectedItems, setSelectedItems] = useState<Map<string, 'entity' | 'association'>>(new Map());
 
+  // View state (Zoom/Pan) - Lifted up to allow reset on import
+  const [view, setView] = useState({ x: 0, y: 0, zoom: 1 });
+
   // Toast notification state
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
@@ -565,6 +568,15 @@ export default function App() {
       backgroundRect.setAttribute('fill', 'transparent');
     }
 
+    // Reset transforms on groups (zoom/pan) to ensure export is not affected by current view
+    // Only target the specific layers (grid and content)
+    ['#grid-layer', '#content-layer'].forEach(selector => {
+      const g = svgClone.querySelector(selector);
+      if (g) {
+        g.removeAttribute('transform');
+      }
+    });
+
     // Convert dark mode colors to light theme for export
     // This ensures PNG export always uses light theme regardless of current theme
     const colorReplacements: { [key: string]: string } = {
@@ -708,6 +720,7 @@ export default function App() {
       setEntities([]);
       setAssociations([]);
       setSelectedItems(new Map());
+      setView({ x: 0, y: 0, zoom: 1 });
     }
   };
 
@@ -731,6 +744,7 @@ export default function App() {
           setEntities(data.entities);
           setAssociations(data.associations);
           setSelectedItems(new Map());
+          setView({ x: 0, y: 0, zoom: 1 });
           setToast({ message: "Import réussi !", type: 'success' });
         } else {
           setToast({ message: "Format de fichier invalide.", type: 'error' });
@@ -768,6 +782,8 @@ export default function App() {
           onCardinalityClick={(assocId, connectionIndex) => {
             setFocusField({ type: 'cardinality', id: assocId, connectionIndex });
           }}
+          view={view}
+          onViewChange={setView}
         />
 
         <div className={`absolute bottom-4 left-4 p-3 rounded-lg shadow-md border pointer-events-none transition-colors duration-300 ${theme === 'dark' ? 'bg-slate-800/90 border-slate-700' : 'bg-white/90 border-slate-200'}`}>
