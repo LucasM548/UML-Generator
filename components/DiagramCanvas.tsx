@@ -362,18 +362,24 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
     const defaultLabelX = defaultExtendX + 5;
     const defaultLabelY = entityCenterY;
 
-    // Actual label position
+    // Actual label position (assoc.x, assoc.y is the center of the label when movable)
     const labelX = assoc.isLabelMovable ? assoc.x : defaultLabelX;
     const labelY = assoc.isLabelMovable ? assoc.y : defaultLabelY;
+
+    // Calculate label text width for centering (approximate: 8px per character)
+    const labelTextWidth = assoc.label.length * 8;
+    // The center of the label text for connection points
+    const labelCenterX = assoc.isLabelMovable ? labelX : (labelX + labelTextWidth / 2);
+    const labelCenterY = labelY;
 
     let simplePathD: string;
     let card1X: number, card1Y: number, card2X: number, card2Y: number;
 
     if (assoc.isLabelMovable) {
-      // Calculate dynamic connection points based on label position
+      // Calculate dynamic connection points based on label center position
       // Determine which side of the entity the label is on
-      const dx = labelX - entityCenterX;
-      const dy = labelY - entityCenterY;
+      const dx = labelCenterX - entityCenterX;
+      const dy = labelCenterY - entityCenterY;
 
       // Calculate two connection points on entity border
       // Point 1: offset slightly up from center direction
@@ -404,14 +410,14 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
       const end = getEntityBorderPoint(angle + offsetAngle);
 
       // Angular path with one corner point
-      // Calculate a corner point between entity and label
-      const corner1X = (start.x + labelX) / 2 + (labelY - start.y) * 0.3;
-      const corner1Y = (start.y + labelY) / 2 - (labelX - start.x) * 0.3;
-      const corner2X = (end.x + labelX) / 2 - (labelY - end.y) * 0.3;
-      const corner2Y = (end.y + labelY) / 2 + (labelX - end.x) * 0.3;
+      // Calculate a corner point between entity and label center
+      const corner1X = (start.x + labelCenterX) / 2 + (labelCenterY - start.y) * 0.3;
+      const corner1Y = (start.y + labelCenterY) / 2 - (labelCenterX - start.x) * 0.3;
+      const corner2X = (end.x + labelCenterX) / 2 - (labelCenterY - end.y) * 0.3;
+      const corner2Y = (end.y + labelCenterY) / 2 + (labelCenterX - end.x) * 0.3;
 
-      // Draw angular paths with corners
-      simplePathD = `M ${start.x} ${start.y} L ${corner1X} ${corner1Y} L ${labelX} ${labelY} M ${labelX} ${labelY} L ${corner2X} ${corner2Y} L ${end.x} ${end.y}`;
+      // Draw angular paths with corners - connect to label center
+      simplePathD = `M ${start.x} ${start.y} L ${corner1X} ${corner1Y} L ${labelCenterX} ${labelCenterY} M ${labelCenterX} ${labelCenterY} L ${corner2X} ${corner2Y} L ${end.x} ${end.y}`;
 
       // Cardinality positions near entity (at start and end points)
       // Offset them outward from entity center
@@ -486,14 +492,14 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
         {/* Selection highlight */}
         {isSelected && (
           <rect
-            x={labelX - 5} y={labelY - 12}
+            x={labelCenterX - assoc.label.length * 4 - 5} y={labelCenterY - 12}
             width={assoc.label.length * 8 + 10} height={24}
             fill="#dbeafe" stroke="#3b82f6" strokeWidth={2} rx={4}
           />
         )}
-        {/* Label */}
+        {/* Label - centered on labelCenterX */}
         <text
-          x={labelX} y={labelY + 4} textAnchor="start"
+          x={labelCenterX} y={labelCenterY + 4} textAnchor="middle"
           style={{
             paintOrder: 'stroke',
             stroke: theme === 'dark' ? '#1e293b' : 'white',
@@ -551,9 +557,9 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
 
           return (
             <>
-              {/* Dashed line connecting label to entity box */}
+              {/* Dashed line connecting label center to entity box */}
               <line
-                x1={labelX} y1={labelY}
+                x1={labelCenterX} y1={labelCenterY}
                 x2={boxCenterX} y2={boxCenterY}
                 stroke={theme === 'dark' ? '#94a3b8' : 'black'} strokeDasharray="4" strokeWidth="1"
                 className="pointer-events-none"
@@ -635,15 +641,22 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
       const assocIndex = sameEntityPairAssocs.findIndex(a => a.id === assoc.id);
       const totalSame = sameEntityPairAssocs.length;
 
-      const center1 = getCenter(entity1);
-      const center2 = getCenter(entity2);
+      // Normalize direction: always use sorted entity IDs to determine consistent direction
+      // This ensures that regardless of which entity is "first" in the connection,
+      // we calculate the offset in the same direction for all associations between the pair
+      const sortedIds = [entity1.id, entity2.id].sort();
+      const normalizedEntity1 = sortedIds[0] === entity1.id ? entity1 : entity2;
+      const normalizedEntity2 = sortedIds[0] === entity1.id ? entity2 : entity1;
 
-      // Calculate perpendicular offset for multiple associations
-      const dx = center2.x - center1.x;
-      const dy = center2.y - center1.y;
+      const normalizedCenter1 = getCenter(normalizedEntity1);
+      const normalizedCenter2 = getCenter(normalizedEntity2);
+
+      // Calculate perpendicular offset using normalized direction
+      const dx = normalizedCenter2.x - normalizedCenter1.x;
+      const dy = normalizedCenter2.y - normalizedCenter1.y;
       const len = Math.sqrt(dx * dx + dy * dy);
 
-      // Perpendicular unit vector
+      // Perpendicular unit vector (consistent direction based on normalized entities)
       const perpX = len > 0 ? -dy / len : 0;
       const perpY = len > 0 ? dx / len : 1;
 
@@ -652,6 +665,10 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
       const offsetAmount = (assocIndex - (totalSame - 1) / 2) * offsetSpacing;
       const offsetX = perpX * offsetAmount;
       const offsetY = perpY * offsetAmount;
+
+      // Get actual centers for drawing (in original order for correct cardinality placement)
+      const center1 = getCenter(entity1);
+      const center2 = getCenter(entity2);
 
       // Apply offset to centers for intersection calculation
       const offsetCenter1 = { x: center1.x + offsetX, y: center1.y + offsetY };
