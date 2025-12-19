@@ -86,9 +86,26 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
     const mouseX = e.clientX - rect.left;
     const mouseY = e.clientY - rect.top;
 
-    // Ctrl+Click: toggle selection without starting drag
+    // Ctrl+Click/Drag: Start connection mode (original behavior)
     if (e.ctrlKey || e.metaKey) {
-      onSelect(id, type, { ctrlKey: true });
+      if (type === 'entity') {
+        setConnectionMode({ sourceId: id, sourceType: 'entity' });
+        onSelect(id, type);
+        return;
+      } else if (type === 'association') {
+        const assoc = obj as import('../types').Association;
+        // Only allow adding connections to n-ary associations (not binary locked)
+        if (assoc.connections.length >= 2) {
+          setConnectionMode({ sourceId: id, sourceType: 'association' });
+          onSelect(id, type);
+          return;
+        }
+      }
+    }
+
+    // Shift+Click: toggle selection (add/remove from multi-selection)
+    if (e.shiftKey) {
+      onSelect(id, type, { ctrlKey: true }); // reusing ctrlKey option for toggle
       return;
     }
 
@@ -130,9 +147,9 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
     const mouseX = e.clientX - rect.left;
     const mouseY = e.clientY - rect.top;
 
-    // Ctrl+Click: toggle selection
-    if (e.ctrlKey || e.metaKey) {
-      onSelect(id, 'association', { ctrlKey: true });
+    // Shift+Click: toggle selection (add/remove from multi-selection)
+    if (e.shiftKey) {
+      onSelect(id, 'association', { ctrlKey: true }); // reusing ctrlKey option for toggle
       return;
     }
 
@@ -346,6 +363,156 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
       // Only render the line once (on the first connection)
       if (connIndex !== 0) return null;
 
+      // Check for self-referencing (reflexive) association
+      const isSelfReferencing = entity1.id === entity2.id;
+
+      if (isSelfReferencing) {
+        // Draw a curved loop for self-referencing association
+        const { width, height } = getEntityDimensions(entity1);
+        const entityRight = entity1.x + width;
+        const entityTop = entity1.y;
+        const entityCenterY = entity1.y + height / 2;
+
+        // Find all self-referencing associations for this entity to offset multiple ones
+        const selfRefAssocs = associations.filter(a => {
+          if (a.connections.length !== 2 || a.isLabelMovable) return false;
+          return a.connections[0].entityId === entity1.id && a.connections[1].entityId === entity1.id;
+        });
+        const selfRefIndex = selfRefAssocs.findIndex(a => a.id === assoc.id);
+        const loopOffset = selfRefIndex * 35;
+
+        // Loop parameters - exit from right side, loop around top-right
+        const startX = entityRight;
+        const startY = entityCenterY - 15;
+        const endX = entityRight;
+        const endY = entityCenterY + 15;
+
+        // Control points for bezier curve (loop to the right and up)
+        const loopSize = 50 + loopOffset;
+        const ctrlX1 = entityRight + loopSize;
+        const ctrlY1 = startY - loopSize;
+        const ctrlX2 = entityRight + loopSize;
+        const ctrlY2 = endY + loopSize;
+
+        // Label position at the rightmost point of the loop
+        const labelX = entityRight + loopSize + 5;
+        const labelY = entityCenterY;
+
+        // Cardinality positions
+        const card1X = startX + 15;
+        const card1Y = startY - 10;
+        const card2X = endX + 15;
+        const card2Y = endY + 15;
+
+        const isSelected = selectedItems.has(assoc.id);
+
+        return (
+          <g
+            key={`${assoc.id}-self-ref`}
+            onMouseDown={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
+              if (e.ctrlKey || e.metaKey) {
+                onSelect(assoc.id, 'association', { ctrlKey: true });
+                return;
+              }
+              if (!selectedItems.has(assoc.id)) {
+                onSelect(assoc.id, 'association');
+              }
+            }}
+            style={{ cursor: 'pointer' }}
+          >
+            {/* Wider invisible path for easier clicking */}
+            <path
+              d={`M ${startX} ${startY} C ${ctrlX1} ${ctrlY1}, ${ctrlX2} ${ctrlY2}, ${endX} ${endY}`}
+              stroke="transparent"
+              strokeWidth="15"
+              fill="none"
+            />
+            {/* Visible curved path */}
+            <path
+              d={`M ${startX} ${startY} C ${ctrlX1} ${ctrlY1}, ${ctrlX2} ${ctrlY2}, ${endX} ${endY}`}
+              stroke={isSelected ? "#3b82f6" : (theme === 'dark' ? '#94a3b8' : 'black')}
+              strokeWidth={isSelected ? 2.5 : 1.5}
+              fill="none"
+            />
+            {/* Selection highlight behind label */}
+            {isSelected && (
+              <rect
+                x={labelX - 40}
+                y={labelY - 12}
+                width={80}
+                height={24}
+                fill="#dbeafe"
+                stroke="#3b82f6"
+                strokeWidth={2}
+                rx={4}
+              />
+            )}
+            {/* Label at the loop */}
+            <text
+              x={labelX}
+              y={labelY + 4}
+              textAnchor="middle"
+              style={{
+                paintOrder: 'stroke',
+                stroke: theme === 'dark' ? '#1e293b' : 'white',
+                strokeWidth: '4px',
+                fill: isSelected ? '#3b82f6' : (theme === 'dark' ? '#f1f5f9' : 'black'),
+                fontSize: '13px',
+                fontWeight: 'bold',
+              }}
+            >
+              {assoc.label}
+            </text>
+            {/* Cardinality 1 */}
+            <text
+              x={card1X}
+              y={card1Y}
+              textAnchor="middle"
+              style={{
+                paintOrder: 'stroke',
+                stroke: theme === 'dark' ? '#1e293b' : 'white',
+                strokeWidth: '5px',
+                fill: theme === 'dark' ? '#a78bfa' : '#7c3aed',
+                fontSize: '13px',
+                fontWeight: 'bold',
+                cursor: 'pointer',
+              }}
+              onClick={(e) => {
+                e.stopPropagation();
+                onSelect(assoc.id, 'association');
+                onCardinalityClick?.(assoc.id, 0);
+              }}
+            >
+              {assoc.connections[0].cardinality}
+            </text>
+            {/* Cardinality 2 */}
+            <text
+              x={card2X}
+              y={card2Y}
+              textAnchor="middle"
+              style={{
+                paintOrder: 'stroke',
+                stroke: theme === 'dark' ? '#1e293b' : 'white',
+                strokeWidth: '5px',
+                fill: theme === 'dark' ? '#a78bfa' : '#7c3aed',
+                fontSize: '13px',
+                fontWeight: 'bold',
+                cursor: 'pointer',
+              }}
+              onClick={(e) => {
+                e.stopPropagation();
+                onSelect(assoc.id, 'association');
+                onCardinalityClick?.(assoc.id, 1);
+              }}
+            >
+              {assoc.connections[1].cardinality}
+            </text>
+          </g>
+        );
+      }
+
       // Find all locked binary associations between the same pair of entities
       const pairKey = [entity1.id, entity2.id].sort().join('-');
       const sameEntityPairAssocs = associations.filter(a => {
@@ -402,8 +569,14 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
           onMouseDown={(e) => {
             e.stopPropagation();
             e.preventDefault();
-            // Ctrl+Click: toggle selection
+            // Ctrl+Click: start connection mode to add entity to this association
             if (e.ctrlKey || e.metaKey) {
+              setConnectionMode({ sourceId: assoc.id, sourceType: 'association' });
+              onSelect(assoc.id, 'association');
+              return;
+            }
+            // Shift+Click: toggle selection
+            if (e.shiftKey) {
               onSelect(assoc.id, 'association', { ctrlKey: true });
               return;
             }
