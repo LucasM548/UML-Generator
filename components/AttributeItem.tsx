@@ -10,11 +10,13 @@ interface AttributeItemProps {
     onDragStart: (e: React.DragEvent, id: string) => void;
     onDragEnd: () => void;
     onDragOver: (e: React.DragEvent, id: string) => void;
+    onDragLeave: (id: string) => void;
     onDrop: (e: React.DragEvent, id: string) => void;
     isDragging: boolean;
     isDragOver: boolean;
     theme: 'light' | 'dark';
     autoFocus?: boolean;
+    dropPosition?: 'top' | 'bottom';
 }
 
 export const AttributeItem: React.FC<AttributeItemProps> = ({
@@ -25,11 +27,13 @@ export const AttributeItem: React.FC<AttributeItemProps> = ({
     onDragStart,
     onDragEnd,
     onDragOver,
+    onDragLeave,
     onDrop,
     isDragging,
     isDragOver,
     theme,
-    autoFocus
+    autoFocus,
+    dropPosition // New prop
 }) => {
     const inputRef = useRef<HTMLInputElement>(null);
 
@@ -46,12 +50,15 @@ export const AttributeItem: React.FC<AttributeItemProps> = ({
             onDragStart={(e) => onDragStart(e, attr.id)}
             onDragEnd={onDragEnd}
             onDragOver={(e) => onDragOver(e, attr.id)}
-            onDragLeave={onDragEnd} // Optional: Reset drag over if leaving
+            onDragLeave={() => onDragLeave(attr.id)}
             onDrop={(e) => onDrop(e, attr.id)}
-            className={`flex gap-1 items-center p-1 rounded border transition-all ${isDragging ? 'opacity-50' : ''
-                } ${isDragOver ? 'border-blue-500 border-2' : ''
-                } ${theme === 'dark' ? 'bg-slate-700 border-slate-600' : 'bg-gray-50 border-gray-200'
-                }`}
+            className={`relative flex gap-1 items-center p-1 rounded border transition-all duration-200
+                ${isDragging ? 'opacity-50' : ''}
+                ${theme === 'dark' ? 'bg-slate-700 border-slate-600' : 'bg-gray-50 border-gray-200'}
+                ${isDragOver && dropPosition === 'top' ? 'border-t-4 border-t-blue-500' : ''}
+                ${isDragOver && dropPosition === 'bottom' ? 'border-b-4 border-b-blue-500' : ''}
+                ${isDragOver && !dropPosition ? 'border-blue-500' : ''} 
+            `}
         >
             <span
                 className={`cursor-grab active:cursor-grabbing select-none px-0.5 ${theme === 'dark' ? 'text-slate-500 hover:text-slate-300' : 'text-gray-400 hover:text-gray-600'

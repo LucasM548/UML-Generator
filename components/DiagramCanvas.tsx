@@ -894,7 +894,7 @@ export const DiagramCanvas: React.FC<DiagramCanvasProps> = ({
             const boxX = assoc.entityBoxX !== undefined ? assoc.entityBoxX : defaultBoxX;
             const boxY = assoc.entityBoxY !== undefined ? assoc.entityBoxY : defaultBoxY;
             const boxCenterX = boxX + boxWidth / 2;
-            const boxCenterY = boxY;
+            const boxCenterY = boxY + boxHeight / 2;
 
             return (
               <>

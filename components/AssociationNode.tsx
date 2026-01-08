@@ -51,7 +51,7 @@ export const AssociationNode: React.FC<AssociationNodeProps> = ({
 
   // Center of the entity box for drawing the line
   const boxCenterX = boxX + boxWidth / 2;
-  const boxCenterY = boxY;
+  const boxCenterY = boxY + boxHeight / 2;
 
   return (
     <g className="select-none">

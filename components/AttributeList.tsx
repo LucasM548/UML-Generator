@@ -49,41 +49,57 @@ export const AttributeList: React.FC<AttributeListProps> = ({
                 </p>
             )}
 
-            {attributes.map((attr) => (
-                <AttributeItem
-                    key={attr.id}
-                    attr={attr}
-                    theme={theme}
-                    onUpdate={onUpdate}
-                    onDelete={onDelete}
-                    onAddNext={onAdd}
-                    onDragStart={(e, id) => {
-                        setDraggedAttrId(id);
-                        e.dataTransfer.effectAllowed = 'move';
-                    }}
-                    onDragEnd={() => {
-                        setDraggedAttrId(null);
-                        setDragOverAttrId(null);
-                    }}
-                    onDragOver={(e, id) => {
-                        e.preventDefault();
-                        if (draggedAttrId && draggedAttrId !== id) {
-                            setDragOverAttrId(id);
-                        }
-                    }}
-                    onDrop={(e, id) => {
-                        e.preventDefault();
-                        if (draggedAttrId && draggedAttrId !== id) {
-                            onReorder(draggedAttrId, id);
-                        }
-                        setDraggedAttrId(null);
-                        setDragOverAttrId(null);
-                    }}
-                    isDragging={draggedAttrId === attr.id}
-                    isDragOver={dragOverAttrId === attr.id}
-                    autoFocus={attr.id === newlyAddedAttrId}
-                />
-            ))}
+            {attributes.map((attr, index) => {
+                const draggedIndex = attributes.findIndex(a => a.id === draggedAttrId);
+                let dropPosition: 'top' | 'bottom' | undefined;
+
+                if (draggedAttrId && draggedAttrId !== attr.id && dragOverAttrId === attr.id && draggedIndex !== -1) {
+                    if (draggedIndex < index) dropPosition = 'bottom';
+                    else dropPosition = 'top';
+                }
+
+                return (
+                    <AttributeItem
+                        key={attr.id}
+                        attr={attr}
+                        theme={theme}
+                        onUpdate={onUpdate}
+                        onDelete={onDelete}
+                        onAddNext={onAdd}
+                        onDragStart={(e, id) => {
+                            setDraggedAttrId(id);
+                            e.dataTransfer.effectAllowed = 'move';
+                        }}
+                        onDragEnd={() => {
+                            setDraggedAttrId(null);
+                            setDragOverAttrId(null);
+                        }}
+                        onDragOver={(e, id) => {
+                            e.preventDefault();
+                            if (draggedAttrId && draggedAttrId !== id) {
+                                setDragOverAttrId(id);
+                            }
+                        }}
+                        onDragLeave={(id) => {
+                            if (dragOverAttrId === id) {
+                                setDragOverAttrId(null);
+                            }
+                        }}
+                        onDrop={(e, id) => {
+                            e.preventDefault();
+                            if (draggedAttrId && draggedAttrId !== id) {
+                                onReorder(draggedAttrId, id);
+                            }
+                            setDraggedAttrId(null);
+                            setDragOverAttrId(null);
+                        }}
+                        isDragging={draggedAttrId === attr.id}
+                        isDragOver={dragOverAttrId === attr.id}
+                        autoFocus={attr.id === newlyAddedAttrId}
+                        dropPosition={dropPosition}
+                    />
+                );
+            })}
         </div>
     );
 };
